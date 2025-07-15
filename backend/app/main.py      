@@ -3,13 +3,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.logging import configure_logging
+from app.core.logging import logger 
 from app.core.settings import Settings, get_settings
 from app.core.dependencies import lifespan_context
 from app.api import api_router
 from app.cron.scheduler import scheduler
 
-configure_logging()                     # ← structlog wired
+logger.info("app_bootstrap", env=settings.env)
 settings: Settings = get_settings()     # single-instance
 
 app = FastAPI(

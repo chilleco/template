@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # --- security ---
     jwt_secret: str = "CHANGE_ME"
 
+    # --- logging ---
+    sentry_dsn: str | None = None
+    sentry_sample_rate: float = 0.1
+
     model_config = SettingsConfigDict(
         env_file=(".env", ".env.local", ".env.dev", ".env.prod"),
         env_file_encoding="utf-8",
