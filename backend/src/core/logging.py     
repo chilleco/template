@@ -1,0 +1,30 @@
+"""Opinionated structlog setup: json to stdout."""
+
+import logging, sys, structlog
+from structlog.processors import JSONRenderer, TimeStamper, StackInfoRenderer
+from structlog.contextvars import bind_contextvars
+from structlog.typing import EventDict
+
+def add_service_name(logger, method, event_dict: EventDict) -> EventDict:
+    event_dict["service"] = "myapp"
+    return event_dict
+
+def configure_logging() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(message)s",
+        stream=sys.stdout,
+    )
+
+    structlog.configure(
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        processors=[
+            add_service_name,
+            TimeStamper(fmt="iso"),
+            StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            JSONRenderer(),
+        ],
+    )
+    # Default per-request trace-id binding example
+    bind_contextvars(request_id="startup")

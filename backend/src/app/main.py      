@@ -1,0 +1,36 @@
+"""FastAPI application bootstrap."""
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.core.logging import configure_logging
+from app.core.settings import Settings, get_settings
+from app.core.dependencies import lifespan_context
+from app.api import api_router
+from app.cron.scheduler import scheduler
+
+configure_logging()                     # ← structlog wired
+settings: Settings = get_settings()     # single-instance
+
+app = FastAPI(
+    title="My Awesome API",
+    version="1.0.0",
+    lifespan=lifespan_context,          # graceful startup/shutdown
+)
+
+# CORS (example: allow swagger in dev)
+if settings.env.lower() != "prod":
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+app.include_router(api_router, prefix="/api/v1")
+
+# start APScheduler after app startup
+@app.on_event("startup")
+async def _start_scheduler() -> None:
+    scheduler.start(paused=False)

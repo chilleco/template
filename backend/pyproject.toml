@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "myapp-backend"
+version = "0.1.0"
+description = "FastAPI + Mongo + Celery backend"
+authors = ["Your Team <dev@example.com>"]
+packages = [{include = "app", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.112"
+uvicorn = {extras = ["standard"], version = "^0.30"}
+pydantic = "^2.7"
+pydantic-settings = "^2.2"
+beanie = "^1.25"
+motor = "^3.4"
+celery = {version = "^5.4", extras = ["redis"]}
+redis = "^5.0"
+apscheduler = "^3.10"
+structlog = "^24.1"
+typer = "^0.12"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2"
+pytest-asyncio = "^0.23"
+httpx = "^0.27"
+pytest-mock = "^3.14"
+black = "^24.4"
+ruff = "^0.4"
+
+[tool.ruff]
+select = ["E", "F", "I", "UP"]
+line-length = 100
+
+[build-system]
+requires = ["poetry-core>=1.9"]
+build-backend = "poetry.core.masonry.api"

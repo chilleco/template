@@ -1,0 +1,28 @@
+"""Centralised configuration (12-factor)."""
+
+from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    # --- generic ---
+    env: str = "local"                 # LOCAL / DEV / PROD
+    log_level: str = "INFO"
+
+    # --- database ---
+    mongo_uri: str = "mongodb://mongo:27017/mydb"
+
+    # --- redis / celery ---
+    redis_url: str = "redis://redis:6379/0"
+
+    # --- security ---
+    jwt_secret: str = "CHANGE_ME"
+
+    model_config = SettingsConfigDict(
+        env_file=(".env", ".env.local", ".env.dev", ".env.prod"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+@lru_cache  # singleton
+def get_settings() -> Settings:       # used by DI & elsewhere
+    return Settings()
