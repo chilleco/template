@@ -1,0 +1,38 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile         # соберём образ (можно переопределить CMD ниже)
+    env_file: .env.test              # специальный тестовый env (может использовать тестовую БД, напр. другую DB_NAME)
+    command: pytest -q               # запускаем тесты бекенда
+    depends_on:
+      - mongo-test
+      - redis-test
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    env_file: .env.test
+    command: npm run test            # запускаем фронт-тесты (например, Jest)
+    depends_on:
+      - backend                      # если фронт-тесты требуют работающий API (например, интеграционные)
+  
+  # Возможно, нам не нужен запущенный backend API для unit-тестов фронта. 
+  # Если нужны интеграционные тесты, можно вместо npm run test использовать Cypress / Playwright и поднять полноценно backend+db.
+
+  mongo-test:
+    image: mongo:6.0
+    # ... можно скопировать конфиг из основного mongo, 
+    # но, например, использовать in-memory MongoDB или специальный volume, чтобы не трогать основной volume
+    volumes:
+      - mongo_test_data:/data/db
+
+  redis-test:
+    image: redis:7-alpine
+    volumes:
+      - redis_test_data:/data
+
+volumes:
+  mongo_test_data:
+  redis_test_data:
