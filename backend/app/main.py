@@ -9,8 +9,8 @@ from app.core.dependencies import lifespan_context
 from app.api.v1 import api_v1_router
 from app.cron.scheduler import scheduler
 
-logger.info("app_bootstrap", env=settings.env)
 settings: Settings = get_settings()     # single-instance
+logger.info("app_bootstrap", env=settings.env)
 
 app = FastAPI(
     title="My Awesome API",
