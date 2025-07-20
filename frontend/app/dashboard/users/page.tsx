@@ -1,5 +1,3 @@
-"use client";
-
 import { DataTable } from "@/components/ui/data-table";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
