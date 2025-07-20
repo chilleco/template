@@ -1,5 +1,9 @@
 // API client configuration
-export const API_BASE_URL = (typeof window !== 'undefined' ? '' : 'http://localhost:8000') || 'http://localhost:8000';
+// For server-side rendering in Docker, use backend service name
+// For client-side (browser), use localhost (host machine)
+export const API_BASE_URL = typeof window !== 'undefined' 
+  ? 'http://localhost:8000/api/v1'  // Browser: use host machine
+  : 'http://backend:8000/api/v1';   // Server (Docker): use service name
 
 // Basic fetch wrapper
 export async function apiRequest(endpoint: string, options: RequestInit = {}) {

@@ -6,24 +6,36 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
-up:        ## Запустить весь стек (dev)
-	docker compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml up -d
+up:        ## Запустить весь стек (production mode - stable)
+	docker-compose --env-file .env -f infra/compose/compose.yml up -d
 
-build:     ## Пересобрать контейнеры
-	docker compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml build
+up-dev:    ## Запустить весь стек (dev mode with volume mounts)
+	docker-compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml up -d
 
-logs:      ## Хвост логов backend + frontend
-	docker compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml logs -f backend frontend
+build:     ## Пересобрать контейнеры (production)
+	docker-compose --env-file .env -f infra/compose/compose.yml build
 
-down:      ## Остановить и удалить контейнеры (без volumes)
-	docker compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml down
+build-dev: ## Пересобрать контейнеры (dev mode)
+	docker-compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml build
+
+logs:      ## Хвост логов backend + frontend (production)
+	docker-compose --env-file .env -f infra/compose/compose.yml logs -f backend frontend
+
+logs-dev:  ## Хвост логов backend + frontend (dev mode)
+	docker-compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml logs -f backend frontend
+
+down:      ## Остановить и удалить контейнеры (production)
+	docker-compose --env-file .env -f infra/compose/compose.yml down
+
+down-dev:  ## Остановить dev режим
+	docker-compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml down
 
 clean:     ## Полный reset окружения
-	docker compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml down -v --remove-orphans
+	docker-compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml down -v --remove-orphans
 	docker system prune -f
 
 test:      ## Локально прогнать тесты в контейнерах
-	docker compose -f infra/compose/compose.yml \
+	docker-compose -f infra/compose/compose.yml \
 	               -f infra/compose/compose.test.yml \
 	               up --build --abort-on-container-exit --exit-code-from backend
 

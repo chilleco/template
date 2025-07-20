@@ -3,7 +3,7 @@ import type { paths } from "@/generated/api/schema";
 
 /** Строго типизированный клиент */
 export const api = makeClient<paths>({
-  baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/v1",
+  baseUrl: process.env.NEXT_PUBLIC_API_URL ?? (typeof window !== 'undefined' ? "http://localhost:8000/v1" : "http://backend:8000/v1"),
 });
 
 export type Fetcher = <T>(

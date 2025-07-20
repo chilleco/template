@@ -14,7 +14,7 @@ log = get_logger()
 async def get_db():
     """Return Mongo client (lazy DI)."""
     settings = get_settings()
-    client = AsyncIOMotorClient(settings.mongo_uri)
+    client = AsyncIOMotorClient(settings.mongo_connection_uri)
     # yield motor-client (Beanie uses it under the hood)
     yield client
     client.close()
@@ -28,8 +28,8 @@ async def lifespan_context(app):
     settings = get_settings()
     mongo = None
     try:
-        mongo = AsyncIOMotorClient(settings.mongo_uri, serverSelectionTimeoutMS=2000)
-        await init_beanie(mongo.db_name, document_models=[User])
+        mongo = AsyncIOMotorClient(settings.mongo_connection_uri, serverSelectionTimeoutMS=2000)
+        await init_beanie(mongo[settings.mongo_dbname], document_models=[User])
         log.info("mongo_connected")
     except Exception as exc:  # noqa: BLE001 - startup must not crash
         log.warning("mongo_connect_failed", error=str(exc))
