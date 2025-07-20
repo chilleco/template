@@ -26,9 +26,15 @@ def get_logger_dep():
 async def lifespan_context(app):
     """Global startup → connect Beanie; shutdown → close."""
     settings = get_settings()
-    mongo = AsyncIOMotorClient(settings.mongo_uri)
-    await init_beanie(mongo.db_name, document_models=[User])
-    log.info("mongo_connected")
+    mongo = None
+    try:
+        mongo = AsyncIOMotorClient(settings.mongo_uri, serverSelectionTimeoutMS=2000)
+        await init_beanie(mongo.db_name, document_models=[User])
+        log.info("mongo_connected")
+    except Exception as exc:  # noqa: BLE001 - startup must not crash
+        log.warning("mongo_connect_failed", error=str(exc))
+        mongo = None
     yield
-    mongo.close()
-    log.info("mongo_closed")
+    if mongo:
+        mongo.close()
+        log.info("mongo_closed")

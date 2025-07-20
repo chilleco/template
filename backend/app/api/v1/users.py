@@ -1,8 +1,8 @@
 from typing import List
 
 from fastapi import APIRouter, HTTPException, status
-from myapp.schemas.user import UserCreate, UserRead, UserUpdate
-from myapp.services.user_service import UserService
+from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.services.user_service import UserService
 
 router = APIRouter(tags=["Users"])
 _svc = UserService()                     # можно заменить на Depends(UserService)

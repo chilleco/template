@@ -2,9 +2,9 @@
 name = "app"
 version = "0.1.0"
 description = ""
-requires-python = ">=3.10,<4.0" 
+requires-python = ">=3.10,<4.0"
 authors = ["Alex Poloz <alexypoloz@gmail.com>"]
-packages = [{include = "app", from = "src"}]
+packages = [{include = "app"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
