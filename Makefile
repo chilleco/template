@@ -21,3 +21,8 @@ test:      ## Локально прогнать тесты в контейнер
 	docker compose -f infra/compose/docker-compose.yml \
 	               -f infra/compose/docker-compose.test.yml \
 	               up --build --abort-on-container-exit --exit-code-from backend
+
+ts-client:
+	poetry run python -m scripts.generate_ts_client --url http://localhost:8000/openapi.json
+
+.PHONY: ts-client

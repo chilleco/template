@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.logging import logger 
 from app.core.settings import Settings, get_settings
 from app.core.dependencies import lifespan_context
-from app.api import api_router
+from app.api.v1 import api_v1_router
 from app.cron.scheduler import scheduler
 
 logger.info("app_bootstrap", env=settings.env)
@@ -28,7 +28,7 @@ if settings.env.lower() != "prod":
         allow_headers=["*"],
     )
 
-app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_v1_router, prefix="/api/v1")
 
 # start APScheduler after app startup
 @app.on_event("startup")

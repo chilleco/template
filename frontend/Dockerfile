@@ -1,32 +1,52 @@
-# Stage 1: builder – собираем Next.js проект
+#######################################################################
+# Stage 1 — builder: устанавливаем зависимости, генерируем TS-клиент,
+#            собираем Next.js в production-режиме
+#######################################################################
 FROM node:18-alpine AS builder
 WORKDIR /app
 
-# Установим зависимости
+# 1. Устанавливаем prod+dev зависимости (npm ci быстрее, чем install)
 COPY package*.json ./
-RUN npm ci         # устанавливаем все пакеты (включая devDependencies, нужные для сборки)
+RUN npm ci
 
-COPY . .           # копируем весь исходный код фронтенда
-RUN npm run build  # выполняем сборку Next.js (пререндер/бандлинг)
+# 2. Копируем исходники фронта
+COPY . .
 
-# Stage 2: final – запуск оптимизированного сборки
+# 3. Копируем OpenAPI-спеку, сгенерированную бекенд-джобой CI
+#    (ожидаем, что файл openapi.json лежит в корне контекста сборки)
+COPY ../backend/openapi.json ./openapi.json
+
+# 4. Генерируем TypeScript-типы и fetch-клиент
+RUN npx openapi-typescript ./openapi.json \
+       -o src/api/schema.ts && \
+    npx openapi-typescript-fetch \
+       --input ./openapi.json \
+       --output src/api/client.ts
+
+# 5. Production-сборка Next.js (используем output = standalone, если задано)
+RUN npm run build
+
+#######################################################################
+# Stage 2 — final: минимальный образ для запуска
+#######################################################################
 FROM node:18-alpine AS final
 WORKDIR /app
-
-# Забираем только необходимые артефакты и зависимости
 ENV NODE_ENV=production
-COPY --from=builder /app/.next ./.next            # Next.js билд (пререндеренные страницы, статика, серверные бандлы)
-COPY --from=builder /app/public ./public          # публичные файлы
-COPY --from=builder /app/package.json ./package.json
 
-# Устанавливаем только production-зависимости (для запуска Next.js сервера)
+# 6. Копируем артефакты сборки
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./package.json
+#  └─ schema.ts и client.ts уже “запечены” внутрь .next-output
+
+# 7. Ставим только prod-зависимости
 RUN npm install --prod
 
-# (Опционально: можно удалить переменные, скрипты сборки и dev-зависимости, если они всё еще подтянулись)
-
-# Создаём пользователя
-RUN addgroup -g 1001 nodegrp && adduser -D -G nodegrp -u 1001 nodeusr && chown -R nodeusr /app
+# 8. Безопасный непривилегированный пользователь
+RUN addgroup -g 1001 nodegrp && \
+    adduser -D -G nodegrp -u 1001 nodeusr && \
+    chown -R nodeusr /app
 USER nodeusr
 
 EXPOSE 3000
-CMD ["npm", "start"]   # запускаем Next.js в режиме production (next start)
+CMD ["npm", "start"]
