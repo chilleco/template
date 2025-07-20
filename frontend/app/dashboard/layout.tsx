@@ -14,9 +14,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button asChild size="sm" variant="outline">
-            <Link href="/sign-in">Sign out</Link>
-          </Button>
+          <Link href="/sign-in">
+            <Button size="sm" variant="outline">Sign out</Button>
+          </Link>
         </div>
       </header>
 

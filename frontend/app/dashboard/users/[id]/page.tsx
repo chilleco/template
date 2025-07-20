@@ -3,11 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
 
-type Props = { params: { id: string } };
+type Props = { params: Promise<{ id: string }> };
 
 export default async function UserDetail({ params }: Props) {
+  const resolvedParams = await params;
   const userResp = await api.GET("/users/{user_id}", {
-    params: { path: { user_id: params.id } },
+    params: { path: { user_id: resolvedParams.id } },
   });
 
   if (!userResp.data) notFound();
@@ -16,7 +17,7 @@ export default async function UserDetail({ params }: Props) {
   async function deactivate() {
     "use server"; // server action
     await api.POST("/users/{user_id}/deactivate", {
-      params: { path: { user_id: params.id } },
+      params: { path: { user_id: resolvedParams.id } },
     });
     redirect("/dashboard/users");
   }

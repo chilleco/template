@@ -9,10 +9,11 @@ export const runtime = "edge";
 
 export async function POST(
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const resolvedParams = await params;
   const res = await api.POST("/users/{user_id}/deactivate", {
-    params: { path: { user_id: params.id } },
+    params: { path: { user_id: resolvedParams.id } },
   });
 
   return res.error
