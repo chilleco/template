@@ -1,0 +1,16 @@
+services:
+  backend:
+    # монтируем исходники внутрь контейнера вместо использования образа
+    volumes:
+      - ../../backend:/app              # весь код бекенда
+      - ../../backend/app.env:/app/app.env  # например, файл конфигурации
+      - ../../.data/local/uploads:/app/data  # локальная папка для файлов (можно настроить)
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    environment:
+      - DEBUG=true                  # можно включить доп. флаги
+  frontend:
+    volumes:
+      - ../../frontend:/app
+    command: npm run dev            # запускаем Next.js в режиме разработки
+    environment:
+      - API_URL=http://localhost:8000/api    # в dev режиме фронт может использовать локальный API

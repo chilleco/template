@@ -1,25 +1,30 @@
 # Makefile at repo-root
-ENV_FILE ?= .env.local
+
+# Export all variables from .env file
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif
 
 up:        ## Запустить весь стек (dev)
-	ENV_FILE=$(ENV_FILE) docker compose up -d
+	docker-compose --env-file .env -f infra/compose/compose.yml -f docker-compose.override.yml up -d
 
 build:     ## Пересобрать контейнеры
-	ENV_FILE=$(ENV_FILE) docker compose build
+	docker-compose --env-file .env -f infra/compose/compose.yml -f docker-compose.override.yml build
 
 logs:      ## Хвост логов backend + frontend
-	docker compose logs -f backend frontend
+	docker-compose --env-file .env -f infra/compose/compose.yml -f docker-compose.override.yml logs -f backend frontend
 
 down:      ## Остановить и удалить контейнеры (без volumes)
-	docker compose down
+	docker-compose --env-file .env -f infra/compose/compose.yml -f docker-compose.override.yml down
 
 clean:     ## Полный reset окружения
-	docker compose down -v --remove-orphans
+	docker-compose --env-file .env -f infra/compose/compose.yml -f docker-compose.override.yml down -v --remove-orphans
 	docker system prune -f
 
 test:      ## Локально прогнать тесты в контейнерах
-	docker compose -f infra/compose/docker-compose.yml \
-	               -f infra/compose/docker-compose.test.yml \
+	docker-compose -f infra/compose/compose.yml \
+	               -f infra/compose/compose.test.yml \
 	               up --build --abort-on-container-exit --exit-code-from backend
 
 ts-client:
