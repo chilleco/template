@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
 
+export const dynamic = 'force-dynamic'; // Prevent static generation
 type Props = { params: Promise<{ id: string }> };
 
 export default async function UserDetail({ params }: Props) {

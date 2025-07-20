@@ -17,12 +17,13 @@ COPY . .
 FROM python:3.11-slim AS final
 
 WORKDIR /app
-# Переносим зависимости из builder
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Копируем requirements.txt и устанавливаем зависимости заново (проще и надежнее)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Копируем приложение ( .py файлы )
-COPY --from=builder /app ./
+COPY . .
 
 # Создаем пользователя для запуска приложения (не root – best practice)
 RUN useradd -m fastapi_user && chown -R fastapi_user /app
@@ -30,5 +31,6 @@ USER fastapi_user
 
 # По умолчанию запускаем сервер (команду можно переопределить через compose при необходимости)
 ENV PORT=8000
+ENV PYTHONPATH=/app
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

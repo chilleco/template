@@ -6,6 +6,7 @@ import { Button } from "@/shared/ui/button";
 import { columns } from "./columns";
 
 export const metadata = { title: "Users – dashboard" };
+export const dynamic = 'force-dynamic'; // Prevent static generation
 
 export default async function UsersPage() {
   const res = await api.GET("/users");

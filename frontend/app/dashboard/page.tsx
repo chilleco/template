@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import UsersPreview from "./users/_users-preview";
 
 export const metadata = { title: "Dashboard – overview" };
+export const dynamic = 'force-dynamic'; // Prevent static generation
 
 export default async function DashboardHome() {
   return (
