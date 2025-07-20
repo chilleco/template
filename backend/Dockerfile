@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Если есть компилируемые зависимости (C-библиотеки), можно установить build-base, а потом удалить, или использовать python:3.11 альпийский + apk.
 # Здесь для простоты используем slim-базу и полагаемся на wheel пакеты.
 
-COPY . .  # копируем весь исходный код FastAPI в образ
+COPY . .
 
 # Stage 2: финальный образ
 FROM python:3.11-slim AS final

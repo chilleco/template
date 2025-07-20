@@ -7,23 +7,23 @@ ifneq (,$(wildcard ./.env))
 endif
 
 up:        ## Запустить весь стек (dev)
-	docker-compose --env-file .env -f infra/compose/compose.yml -f docker-compose.override.yml up -d
+	docker compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml up -d
 
 build:     ## Пересобрать контейнеры
-	docker-compose --env-file .env -f infra/compose/compose.yml -f docker-compose.override.yml build
+	docker compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml build
 
 logs:      ## Хвост логов backend + frontend
-	docker-compose --env-file .env -f infra/compose/compose.yml -f docker-compose.override.yml logs -f backend frontend
+	docker compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml logs -f backend frontend
 
 down:      ## Остановить и удалить контейнеры (без volumes)
-	docker-compose --env-file .env -f infra/compose/compose.yml -f docker-compose.override.yml down
+	docker compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml down
 
 clean:     ## Полный reset окружения
-	docker-compose --env-file .env -f infra/compose/compose.yml -f docker-compose.override.yml down -v --remove-orphans
+	docker compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml down -v --remove-orphans
 	docker system prune -f
 
 test:      ## Локально прогнать тесты в контейнерах
-	docker-compose -f infra/compose/compose.yml \
+	docker compose -f infra/compose/compose.yml \
 	               -f infra/compose/compose.test.yml \
 	               up --build --abort-on-container-exit --exit-code-from backend
 

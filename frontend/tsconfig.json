@@ -12,12 +12,12 @@
       "esModuleInterop": true,
       "isolatedModules": true,
       "noEmit": true,
-      "types": ["node"],
+      "jsx": "preserve",
       "paths": {
-        "@/*": ["./src/*"]
+        "@/*": ["./*"]
       }
     },
-    "include": ["next-env.d.ts", "src/**/*"],
+    "include": ["next-env.d.ts", "**/*"],
     "exclude": ["node_modules"]
   }
   

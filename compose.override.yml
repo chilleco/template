@@ -1,0 +1,18 @@
+services:
+  backend:
+    # Mount source code for development with hot reload
+    volumes:
+      - ./backend:/app              # Mount backend source code
+      - ./backend/app.env:/app/app.env  # Configuration file (if exists)
+      - ./.data/local/uploads:/app/data  # Local uploads directory
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    environment:
+      - DEBUG=true                  # Enable debug mode
+  
+  frontend:
+    volumes:
+      - ./frontend:/app             # Mount frontend source code
+      - /app/node_modules           # Preserve node_modules in container
+    command: npm run dev            # Next.js dev mode with hot reload
+    environment:
+      - API_URL=http://localhost:8000/api    # Development API URL
