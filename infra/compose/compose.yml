@@ -1,61 +1,43 @@
+version: '3.8'
 services:
   backend:
-    build: 
-      context: ../../backend
-      dockerfile: Dockerfile
-    # env_file: .env # handled via --env-file in Makefile
-    environment:
-      - ENV=${ENV}                       # тип окружения (LOCAL/DEV/PROD)
-      - MONGO_URI=${MONGO_URI}
-      - REDIS_URI=${REDIS_URI}
-      - OTHER_CONFIG=${OTHER_CONFIG}
-      - MONGO_USER=${MONGO_USER}
-      - MONGO_PASS=${MONGO_PASS}
-      - MONGO_DBNAME=${MONGO_DBNAME}
-    volumes:
-      - app_data:/app/data               # прим.: хранилище файлов (uploads) 
-      - logs_data:/app/logs              # прим.: если логируем в файл (опционально)
+    build: ./backend
+    env_file: .env              # локальные переменные (например, DEBUG, database_url)
     ports:
-      - "127.0.0.1:8000:8000"            # публикуем порт бэкенда (на localhost только)
+      - "8000:8000"
     depends_on:
-      - mongo
-      - redis
-
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
   frontend:
-    build:
-      context: ../../frontend
-      dockerfile: Dockerfile
-    # env_file: .env # handled via --env-file in Makefile
-    environment:
-      - ENV=${ENV}
-      - API_URL=${API_URL}               # базовый URL API (может отличаться локально/на прод)
-    volumes:
-      - node_modules_cache:/app/node_modules # кеш npm (в dev можно примонтировать)
+    build: ./frontend
     ports:
-      - "127.0.0.1:3000:3000"            # Next.js порт
-    depends_on:
-      - backend                         # (если фронт должен дождаться API, обычно не обязательно)
-
-  mongo:
-    image: mongo:6.0
-    volumes:
-      - mongo_data:/data/db             # постоянное хранение данных Mongo
+      - "3000:3000"
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASS}
-      - MONGO_INITDB_DATABASE=${MONGO_DBNAME}
-    # ports: [ "27017:27017" ] # локально можно открыть порт, но не обязательно (backend подключается по внутренней сети)
-
+      - API_BASE_URL=http://localhost:8000    # фронтенд будет обращаться к локальному API
+    depends_on:
+      - backend
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: myapp
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypass
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser"]
+      interval: 5s
+      retries: 5
   redis:
-    image: redis:7-alpine
-    volumes:
-      - redis_data:/data                # хранение очереди (необязательно в продакшене, но полезно для долговременного хранения)
-    # ports: [ "6379:6379" ] # обычно нет надобности открывать наружу
-
-# Объявление именованных томов (чтобы Docker создавал их вне контейнеров)
-volumes:
-  mongo_data:
-  redis_data:
-  app_data:
-  logs_data:
-  node_modules_cache:
+    image: redis:7
+    command: ["redis-server", "--requirepass", "redispass"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+  worker:
+    build: ./backend
+    command: celery -A app.workers.tasks worker --loglevel=info
+    depends_on:
+      - backend
+      - redis

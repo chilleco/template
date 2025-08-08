@@ -1,61 +1,48 @@
-// API client configuration
-// For server-side rendering in Docker, use backend service name
-// For client-side (browser), use localhost (host machine)
-export const API_BASE_URL = typeof window !== 'undefined' 
-  ? 'http://localhost:8000/api/v1'  // Browser: use host machine
-  : 'http://backend:8000/api/v1';   // Server (Docker): use service name
+import axios from 'axios';
 
-// Basic fetch wrapper
-export async function apiRequest(endpoint: string, options: RequestInit = {}) {
-  const url = `${API_BASE_URL}${endpoint}`;
-  
-  const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  });
+const API_BASE = process.env.API_BASE_URL || 'https://api.myapp.com';
 
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.statusText}`);
+// Создаем экземпляр axios с базовыми настройками
+export const apiClient = axios.create({
+  baseURL: API_BASE,
+  timeout: 10000,
+});
+
+// Интерцептор: автоматическое подставление JWT токена в заголовки
+apiClient.interceptors.request.use(config => {
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
   }
+  return config;
+});
 
-  return response.json();
-}
-
-// Auth API functions
-export const auth = {
-  signIn: (credentials: { email: string; password: string }) =>
-    apiRequest('/auth/signin', {
-      method: 'POST',
-      body: JSON.stringify(credentials),
-    }),
-  
-  signUp: (userData: { email: string; password: string; name: string }) =>
-    apiRequest('/auth/signup', {
-      method: 'POST', 
-      body: JSON.stringify(userData),
-    }),
-};
-
-// Simple API object for testing (to prevent build hangs)
-export const api = {
-  GET: (endpoint: string, options?: any) => {
-    // Simple path replacement for testing
-    let url = endpoint.replace('{user_id}', options?.params?.path?.user_id || 'test');
-    return apiRequest(url, { method: 'GET' });
-  },
-  POST: (endpoint: string, options?: any) => {
-    let url = endpoint.replace('{user_id}', options?.params?.path?.user_id || 'test');
-    return apiRequest(url, { method: 'POST', body: options?.body ? JSON.stringify(options.body) : undefined });
-  },
-  PUT: (endpoint: string, options?: any) => {
-    let url = endpoint.replace('{user_id}', options?.params?.path?.user_id || 'test');
-    return apiRequest(url, { method: 'PUT', body: options?.body ? JSON.stringify(options.body) : undefined });
-  },
-  DELETE: (endpoint: string, options?: any) => {
-    let url = endpoint.replace('{user_id}', options?.params?.path?.user_id || 'test');
-    return apiRequest(url, { method: 'DELETE' });
-  },
-}; 
+// Интерцептор: обработка 401 ответа (например, попытка refresh)
+apiClient.interceptors.response.use(
+  response => response,
+  async error => {
+    if (error.response && error.response.status === 401) {
+      // токен просрочен, пробуем обновить
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        // вызов нашего /auth/token/refresh
+        try {
+          const res = await axios.post(`${API_BASE}/auth/token/refresh`, {}, {
+            headers: {'Authorization': `Bearer ${refreshToken}`}
+          });
+          localStorage.setItem('access_token', res.data.access_token);
+          // повторяем оригинальный запрос
+          error.config.headers['Authorization'] = `Bearer ${res.data.access_token}`;
+          return axios(error.config);
+        } catch (refreshErr) {
+          // не удалось refresh – редирект на логин
+          window.location.href = '/login';
+        }
+      } else {
+        // нет refresh токена – редирект на логин
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
