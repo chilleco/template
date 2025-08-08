@@ -1,0 +1,73 @@
+version: "3.9"
+
+networks:
+  traefik-public:
+    external: true
+  app-net: {}
+
+volumes:
+  traefik-cert: {}
+
+services:
+  traefik:
+    image: traefik:v3.0
+    command:
+      - --providers.docker=true
+      - --providers.docker.swarmMode=true
+      - --providers.docker.exposedByDefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.le.acme.email=${LE_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --accesslog=true
+      - --log.level=INFO
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-cert:/letsencrypt
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+    networks:
+      - traefik-public
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+
+  api:
+    deploy:
+      replicas: 4
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 10s
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: "2G"
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.api.rule=Host(`${API_HOST}`)
+        - traefik.http.routers.api.entrypoints=websecure
+        - traefik.http.routers.api.tls.certresolver=le
+        - traefik.http.services.api.loadbalancer.server.port=8000
+
+  frontend:
+    deploy:
+      replicas: 3
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 10s
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: "1.5G"
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.web.rule=Host(`${WEB_HOST}`)
+        - traefik.http.routers.web.entrypoints=websecure
+        - traefik.http.routers.web.tls.certresolver=le
+        - traefik.http.services.web.loadbalancer.server.port=3000

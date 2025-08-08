@@ -1,26 +1,46 @@
-from fastapi import FastAPI
-from .config import settings
-from .api import auth, posts, payments
-import logging
+# backend/app/main.py
+import os
+from fastapi import FastAPI, WebSocket
+from loguru import logger
+from .core import config, logging as log_config
+from .api import posts, users, chat
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastAPIIntegration
 
-app = FastAPI(title="My FinApp", version="1.0")
+# Initialize Sentry for error monitoring
+SENTRY_DSN = os.getenv("SENTRY_DSN")
+if SENTRY_DSN:
+    sentry_sdk.init(dsn=SENTRY_DSN, integrations=[FastAPIIntegration()])
 
-# Инициализация логирования (структурированный вывод JSON в stdout)
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+app = FastAPI(
+    title="MyProject API",
+    description="Backend API for MyProject",
+    version="1.0.0",
+    docs_url="/docs", redoc_url="/redoc"  # Swagger UI and ReDoc
+)
 
-# Подключение роутеров (с префиксами)
-app.include_router(auth.router, prefix="/auth")
-app.include_router(posts.router, prefix="/posts", dependencies=[]) 
-app.include_router(payments.router, prefix="/payments")
+# Set up logging (Loguru)
+logger.remove()  # remove default logger
+# Add a rotating file logger and console logger
+logger.add("logs/app.log", rotation="1 week", retention="4 weeks",
+           backtrace=True, diagnose=True, level="INFO")
+logger.add(sys.stderr, level="INFO")  # also log to stderr for Docker
 
-# Пример события запуска: подключение к БД, инициализация, миграции
-@app.on_event("startup")
-async def startup_event():
-    # Подключение к базе данных, проверка соединения
-    # Выполнение миграций (например, через Alembic)
-    logging.info("Application startup: database connected and migrations applied")
+# Include API routers
+app.include_router(users.router, prefix="/api/users", tags=["users"])
+app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
+app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 
-# Пример события остановки
-@app.on_event("shutdown")
-async def shutdown_event():
-    logging.info("Application shutdown: closing connections")
+# Example WebSocket endpoint for live chat (within chat router or here)
+@app.websocket("/ws/chat")
+async def chat_websocket(ws: WebSocket):
+    await ws.accept()
+    user = await authenticate_ws(ws)  # pseudocode: authenticate the user for WS
+    CONNECTIONS.add(user.id, ws)      # add to some global connection manager
+    try:
+        while True:
+            data = await ws.receive_text()
+            # Broadcast the message to other users (via Redis pub/sub or in-memory)
+            await broadcast_message(user, data)
+    except WebSocketDisconnect:
+        CONNECTIONS.remove(user.id)

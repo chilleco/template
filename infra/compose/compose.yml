@@ -1,43 +1,71 @@
-version: '3.8'
+version: "3.9"
+
+networks:
+  traefik-public:
+    external: true
+  app-net: {}
+
 services:
-  backend:
-    build: ./backend
-    env_file: .env              # локальные переменные (например, DEBUG, database_url)
-    ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
+  api:
+    image: ${IMAGE_API}:${TAG}
+    env_file:
+      - ${ENV_FILE}
     environment:
-      - API_BASE_URL=http://localhost:8000    # фронтенд будет обращаться к локальному API
-    depends_on:
-      - backend
-  db:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: myapp
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mypass
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U myuser"]
-      interval: 5s
-      retries: 5
-  redis:
-    image: redis:7
-    command: ["redis-server", "--requirepass", "redispass"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      retries: 5
+      # серверная часть (FastAPI) читает эти переменные
+      - SENTRY_DSN=${SENTRY_DSN}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - UVICORN_WORKERS=1
+    deploy:
+      restart_policy:
+        condition: on-failure
+    networks:
+      - app-net
+      - traefik-public
+    expose:
+      - "8000"
+
   worker:
-    build: ./backend
-    command: celery -A app.workers.tasks worker --loglevel=info
-    depends_on:
-      - backend
-      - redis
+    image: ${IMAGE_API}:${TAG}
+    command: ["celery", "-A", "app.tasks.celery_app", "worker", "--concurrency=4", "-l", "INFO"]
+    env_file:
+      - ${ENV_FILE}
+    environment:
+      - SENTRY_DSN=${SENTRY_DSN}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+    deploy:
+      restart_policy:
+        condition: on-failure
+    networks:
+      - app-net
+
+  frontend:
+    image: ${IMAGE_WEB}:${TAG}
+    env_file:
+      - ${ENV_FILE}
+    environment:
+      # SSR (сервер) ходит во внутренний API, клиент — во внешний домен
+      - API_INTERNAL_URL=http://api:8000
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - SENTRY_DSN=${SENTRY_DSN_FRONT}
+      - NODE_ENV=production
+    deploy:
+      restart_policy:
+        condition: on-failure
+    networks:
+      - app-net
+      - traefik-public
+    expose:
+      - "3000"
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    deploy:
+      restart_policy:
+        condition: on-failure
+    networks:
+      - app-net
