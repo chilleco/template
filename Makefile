@@ -10,7 +10,11 @@ up:        ## Запустить весь стек (production mode - stable)
 	docker-compose --env-file .env -f infra/compose/compose.yml up -d
 
 up-dev:    ## Запустить весь стек (dev mode with volume mounts)
-	docker-compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml up -d
+	docker compose \
+		-f infra/compose/compose.yml \
+		-f infra/compose/compose.dev.yml \
+		-f compose.local.yml \
+		up -d
 
 build:     ## Пересобрать контейнеры (production)
 	docker-compose --env-file .env -f infra/compose/compose.yml build

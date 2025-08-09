@@ -1,71 +1,30 @@
-version: "3.9"
-
-networks:
-  traefik-public:
-    external: true
-  app-net: {}
-
 services:
   api:
-    image: ${IMAGE_API}:${TAG}
+    build:
+      context: ./../../backend
     env_file:
-      - ${ENV_FILE}
-    environment:
-      # серверная часть (FastAPI) читает эти переменные
-      - SENTRY_DSN=${SENTRY_DSN}
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
-      - UVICORN_WORKERS=1
-    deploy:
-      restart_policy:
-        condition: on-failure
-    networks:
-      - app-net
-      - traefik-public
-    expose:
-      - "8000"
+      - ./../../backend/.env.local
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo
+      - redis
 
-  worker:
-    image: ${IMAGE_API}:${TAG}
-    command: ["celery", "-A", "app.tasks.celery_app", "worker", "--concurrency=4", "-l", "INFO"]
-    env_file:
-      - ${ENV_FILE}
+  web:
+    build:
+      context: ./../../frontend
     environment:
-      - SENTRY_DSN=${SENTRY_DSN}
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
-    deploy:
-      restart_policy:
-        condition: on-failure
-    networks:
-      - app-net
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/v1
+    ports:
+      - "3000:3000"
 
-  frontend:
-    image: ${IMAGE_WEB}:${TAG}
-    env_file:
-      - ${ENV_FILE}
-    environment:
-      # SSR (сервер) ходит во внутренний API, клиент — во внешний домен
-      - API_INTERNAL_URL=http://api:8000
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-      - SENTRY_DSN=${SENTRY_DSN_FRONT}
-      - NODE_ENV=production
-    deploy:
-      restart_policy:
-        condition: on-failure
-    networks:
-      - app-net
-      - traefik-public
-    expose:
-      - "3000"
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_data:/data/db
 
   redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    deploy:
-      restart_policy:
-        condition: on-failure
-    networks:
-      - app-net
+    image: redis:7
+
+volumes:
+  mongo_data:
