@@ -1,5 +1,5 @@
 # Stage 1: сборка зависимостей и приложения
-FROM python:3.11-slim AS builder
+FROM python:3.13-slim AS builder
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Stage 2: финальный образ
-FROM python:3.11-slim AS final
+FROM python:3.13-slim AS final
 
 WORKDIR /app
 

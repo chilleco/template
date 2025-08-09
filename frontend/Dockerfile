@@ -2,10 +2,10 @@
 # Stage 1 — builder: устанавливаем зависимости, генерируем TS-клиент,
 #            собираем Next.js в production-режиме
 #######################################################################
-FROM node:18-alpine AS builder
+FROM node:24.5-alpine AS builder
 WORKDIR /app
 
-# 1. Устанавливаем prod+dev зависимости 
+# 1. Устанавливаем prod+dev зависимости
 COPY package*.json ./
 # Используем npm ci если есть package-lock.json, иначе npm install с --legacy-peer-deps для совместимости
 RUN if [ -f "package-lock.json" ]; then npm ci; else npm install --legacy-peer-deps; fi
@@ -26,7 +26,7 @@ RUN npm run build
 #######################################################################
 # Stage 2 — final: минимальный образ для запуска
 #######################################################################
-FROM node:18-alpine AS final
+FROM node:24.5-alpine AS final
 WORKDIR /app
 ENV NODE_ENV=production
 
