@@ -1,51 +1,48 @@
+networks:
+  app-net: {}
+
 services:
-  backend:
-    build:
-      context: ../../backend
-    env_file: .env
-    volumes:
-      - app_data:/app/data
-      - logs_data:/app/logs
-    ports:
-      - "8000:8000"
-    depends_on:
-      - mongo
-      - redis
+  api:
+    image: ${REGISTRY:-local}/${PROJECT_SLUG:-app}/api:${TAG:-local}
+    env_file: ../../.env
+    networks: [ app-net ]
+    expose: [ "8000" ]
+    deploy:
+      restart_policy: { condition: on-failure }
+
+  worker:
+    image: ${REGISTRY:-local}/${PROJECT_SLUG:-app}/api:${TAG:-local}
+    command: [ "celery", "-A", "app.tasks.celery_app", "worker", "-Q", "high,default,low", "--concurrency=4", "--loglevel=INFO", "-O", "fair" ]
+    env_file: ../../.env
+    networks: [ app-net ]
+    deploy:
+      restart_policy: { condition: on-failure }
+      replicas: 2
+
+  scheduler:
+    image: ${REGISTRY:-local}/${PROJECT_SLUG:-app}/api:${TAG:-local}
+    command: [ "celery", "-A", "app.tasks.celery_app", "beat", "--scheduler", "redbeat.RedBeatScheduler" ]
+    env_file: ../../.env
+    networks: [ app-net ]
+    deploy:
+      restart_policy: { condition: on-failure }
+
+  # daemon:
+  #   image: ${REGISTRY:-local}/${PROJECT_SLUG:-app}/api:${TAG:-local}
+  #   command: [ "python", "-m", "app.services.realtime_poller" ]
+  #   env_file: ../../.env
+  #   networks: [ app-net ]
+  #   deploy:
+  #     restart_policy: { condition: on-failure }
+  #     replicas: 1
 
   frontend:
-    build:
-      context: ../../frontend
-    env_file: .env
+    image: ${REGISTRY:-local}/${PROJECT_SLUG:-app}/web:${TAG:-local}
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000/v1
-    volumes:
-      - node_modules_cache:/app/node_modules
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-
-  mongo:
-    image: mongo:8.0
-    volumes:
-      - mongo_data:/data/db
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASS}
-      - MONGO_INITDB_DATABASE=${MONGO_DBNAME}
-    ports:
-      - "27017:27017"
-
-  redis:
-    image: redis:8.2
-    volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
-
-volumes:
-  mongo_data:
-  redis_data:
-  app_data:
-  logs_data:
-  node_modules_cache:
+      ENV: ${ENV}
+      NEXT_PUBLIC_API_URL: ${API_URL}
+      SENTRY_DSN: ${SENTRY_DSN_FRONT:-}
+    networks: [ app-net ]
+    expose: [ "3000" ]
+    deploy:
+      restart_policy: { condition: on-failure }

@@ -4,6 +4,3 @@
 __pycache__/
 *.py[cod]
 .venv/
-/compose.local.yml
-/docker-compose.override.yml
-/compose.override.yml
