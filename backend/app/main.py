@@ -1,16 +1,17 @@
 # backend/app/main.py
 import os
-from fastapi import FastAPI, WebSocket
+import sys
+from fastapi import FastAPI
 from loguru import logger
 from .core import config, logging as log_config
-from .api import posts, users, chat
+from .api.v1 import posts, users
 import sentry_sdk
-from sentry_sdk.integrations.fastapi import FastAPIIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 # Initialize Sentry for error monitoring
 SENTRY_DSN = os.getenv("SENTRY_DSN")
 if SENTRY_DSN:
-    sentry_sdk.init(dsn=SENTRY_DSN, integrations=[FastAPIIntegration()])
+    sentry_sdk.init(dsn=SENTRY_DSN, integrations=[StarletteIntegration()])
 
 app = FastAPI(
     title="MyProject API",
@@ -26,21 +27,10 @@ logger.add("logs/app.log", rotation="1 week", retention="4 weeks",
            backtrace=True, diagnose=True, level="INFO")
 logger.add(sys.stderr, level="INFO")  # also log to stderr for Docker
 
-# Include API routers
-app.include_router(users.router, prefix="/api/users", tags=["users"])
-app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
-app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+# Include API routers  
+app.include_router(users.router, prefix="/api/v1", tags=["users"])
+app.include_router(posts.router, prefix="/api/v1", tags=["posts"])
 
-# Example WebSocket endpoint for live chat (within chat router or here)
-@app.websocket("/ws/chat")
-async def chat_websocket(ws: WebSocket):
-    await ws.accept()
-    user = await authenticate_ws(ws)  # pseudocode: authenticate the user for WS
-    CONNECTIONS.add(user.id, ws)      # add to some global connection manager
-    try:
-        while True:
-            data = await ws.receive_text()
-            # Broadcast the message to other users (via Redis pub/sub or in-memory)
-            await broadcast_message(user, data)
-    except WebSocketDisconnect:
-        CONNECTIONS.remove(user.id)
+@app.get("/")
+async def root():
+    return {"message": "API is running"}

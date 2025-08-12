@@ -79,6 +79,24 @@ down:      ## Остановить и удалить контейнеры (produ
 down-dev:  ## Остановить dev режим
 	docker-compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml down
 
+down-local:
+	docker compose \
+		--env-file $(ENV_FILE) \
+		-f $(COMPOSE_BASE) \
+		-f $(COMPOSE_LOCAL) \
+		down
+
+status:
+	@echo "=== Running Containers ==="
+	@docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+	@echo ""
+	@echo "=== All Project Containers ==="
+	@docker compose \
+		--env-file $(ENV_FILE) \
+		-f $(COMPOSE_BASE) \
+		-f $(COMPOSE_LOCAL) \
+		ps
+
 clean:     ## Полный reset окружения
 	docker-compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml down -v --remove-orphans
 	docker system prune -f

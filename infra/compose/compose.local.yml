@@ -5,17 +5,19 @@ volumes:
   app_data: {}
   logs_data: {}
   node_modules_cache: {}
+  celery_beat_data: {}
 
 services:
   api:
     build:
-      context: ../backend
+      context: ../../backend
     command: [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload" ]
     env_file: ../../.env
     volumes:
-      - ../backend:/app
+      - ../../backend:/app
     ports:
       - "8000:8000"
+    networks: [ app-net ]
     depends_on:
       - mongo
       - postgres
@@ -23,11 +25,26 @@ services:
 
   worker:
     build:
-      context: ../backend
+      context: ../../backend
     command: [ "celery", "-A", "app.tasks.celery_app", "worker", "--concurrency=2", "--loglevel=INFO" ]
     env_file: ../../.env
     volumes:
-      - ../backend:/app
+      - ../../backend:/app
+    networks: [ app-net ]
+    depends_on:
+      - mongo
+      - postgres
+      - redis
+
+  scheduler:
+    build:
+      context: ../../backend
+    command: [ "celery", "-A", "app.tasks.celery_app", "beat", "--schedule=/app/celerybeat/celerybeat-schedule" ]
+    env_file: ../../.env
+    volumes:
+      - ../../backend:/app
+      - celery_beat_data:/app/celerybeat
+    networks: [ app-net ]
     depends_on:
       - mongo
       - postgres
@@ -35,16 +52,19 @@ services:
 
   frontend:
     build:
-      context: ../frontend
-    command: [ "npm", "run", "dev" ]
+      context: ../../frontend
+      target: builder
+    command: [ "sh", "-c", "npm install --legacy-peer-deps && npm run dev" ]
     environment:
       ENV: local
       NEXT_PUBLIC_API_URL: ${API_URL}
       SENTRY_DSN:
     volumes:
-      - ../frontend:/app
+      - ../../frontend:/app
+      - node_modules_cache:/app/node_modules
     ports:
       - "3000:3000"
+    networks: [ app-net ]
     depends_on:
       - api
 
@@ -90,3 +110,6 @@ services:
     #   interval: 5s
     #   timeout: 3s
     #   retries: 10
+
+networks:
+  app-net: {}

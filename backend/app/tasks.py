@@ -1,5 +1,8 @@
+import os
 from celery import Celery
+from structlog import get_logger
 
+logger = get_logger()
 celery_app = Celery(__name__, broker=os.getenv("REDIS_URL", "redis://redis:6379/0"))
 
 @celery_app.task(name="send_welcome_email")

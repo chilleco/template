@@ -1,16 +1,17 @@
-from beanie import Document, Indexed
-from pydantic import Field, EmailStr
-from datetime import datetime
+# from beanie import Document, Indexed
+# from pydantic import Field, EmailStr
+# from datetime import datetime
 
-class User(Document):
-    email: EmailStr = Indexed(unique=True)
-    name: str
-    is_active: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+# class User(Document):
+#     email: EmailStr = Indexed(unique=True)
+#     name: str
+#     is_active: bool = True
+#     created_at: datetime = Field(default_factory=datetime.utcnow)
+#     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    class Settings:
-        name = "users"
+#     class Settings:
+#         name = "users"
+
 
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Text
 from sqlalchemy.orm import declarative_base, relationship
@@ -23,8 +24,11 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     email = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
     role = Column(String, default="user")  # роли: guest, user, moderator, admin, owner
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
 
 class Post(Base):
     __tablename__ = "posts"
@@ -41,7 +45,7 @@ class Attachment(Base):
     post_id = Column(Integer, ForeignKey('posts.id'))
     type = Column(String, nullable=False)       # тип вложения: image, file, poll, etc.
     url = Column(String, nullable=False)        # ссылка на хранение (например, URL в Object Storage)
-    metadata = Column(String)                   # доп. данные (JSON строка или поля, напр. опции голосования)
+    meta_data = Column(String)                   # renamed from metadata to avoid conflict
     post = relationship("Post", back_populates="attachments")
 
 class Comment(Base):
@@ -51,4 +55,3 @@ class Comment(Base):
     author_id = Column(Integer, ForeignKey('users.id'))
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    # отношения (Post, User) можно также определить для удобства

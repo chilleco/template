@@ -4,3 +4,9 @@
 __pycache__/
 *.py[cod]
 .venv/
+.next/
+*.log
+
+# Celery Beat schedule files
+backend/celerybeat-schedule
+backend/celerybeat.pid
