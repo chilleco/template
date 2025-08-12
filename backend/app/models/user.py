@@ -29,15 +29,10 @@ class User(Base):
     role = Column(String, default="user")  # роли: guest, user, moderator, admin, owner
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
+    
+    posts = relationship("Post", back_populates="author")
 
-class Post(Base):
-    __tablename__ = "posts"
-    id = Column(Integer, primary_key=True)
-    author_id = Column(Integer, ForeignKey('users.id'))
-    content = Column(Text, nullable=False)      # текст в формате Markdown
-    created_at = Column(DateTime, default=datetime.utcnow)
-    # Приложения (attachments) хранятся отдельной сущностью:
-    attachments = relationship("Attachment", back_populates="post")
+
 
 class Attachment(Base):
     __tablename__ = "attachments"

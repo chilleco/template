@@ -55,6 +55,27 @@ up-local:
 		-f $(COMPOSE_LOCAL) \
 		up -d
 
+down:
+	docker-compose \
+		--env-file $(ENV_FILE) \
+		-f $(COMPOSE_BASE) \
+		-f $(COMPOSE_PROD) \
+		down
+
+down-dev:
+	docker-compose \
+		--env-file $(ENV_FILE) \
+		-f $(COMPOSE_BASE) \
+		-f $(COMPOSE_DEV) \
+		down
+
+down-local:
+	docker compose \
+		--env-file $(ENV_FILE) \
+		-f $(COMPOSE_BASE) \
+		-f $(COMPOSE_LOCAL) \
+		down
+
 deploy-dev:
 	. $(ENV_FILE); docker stack deploy \
 		-c $(COMPOSE_BASE) \
@@ -72,19 +93,6 @@ logs:      ## Хвост логов backend + frontend (production)
 
 logs-dev:  ## Хвост логов backend + frontend (dev mode)
 	docker-compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml logs -f backend frontend
-
-down:      ## Остановить и удалить контейнеры (production)
-	docker-compose --env-file .env -f infra/compose/compose.yml down
-
-down-dev:  ## Остановить dev режим
-	docker-compose --env-file .env -f infra/compose/compose.yml -f compose.override.yml down
-
-down-local:
-	docker compose \
-		--env-file $(ENV_FILE) \
-		-f $(COMPOSE_BASE) \
-		-f $(COMPOSE_LOCAL) \
-		down
 
 status:
 	@echo "=== Running Containers ==="

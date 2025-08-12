@@ -17,7 +17,6 @@ services:
       - ../../backend:/app
     ports:
       - "8000:8000"
-    networks: [ app-net ]
     depends_on:
       - mongo
       - postgres
@@ -30,7 +29,6 @@ services:
     env_file: ../../.env
     volumes:
       - ../../backend:/app
-    networks: [ app-net ]
     depends_on:
       - mongo
       - postgres
@@ -44,7 +42,6 @@ services:
     volumes:
       - ../../backend:/app
       - celery_beat_data:/app/celerybeat
-    networks: [ app-net ]
     depends_on:
       - mongo
       - postgres
@@ -54,17 +51,19 @@ services:
     build:
       context: ../../frontend
       target: builder
-    command: [ "sh", "-c", "npm install --legacy-peer-deps && npm run dev" ]
+    user: "0:0"
+    command: [ "sh", "-c", "npm ci || npm install --legacy-peer-deps; npm run dev" ]
     environment:
+      NODE_ENV: development
       ENV: local
       NEXT_PUBLIC_API_URL: ${API_URL}
       SENTRY_DSN:
+      CHOKIDAR_USEPOLLING: "true"
     volumes:
       - ../../frontend:/app
       - node_modules_cache:/app/node_modules
     ports:
       - "3000:3000"
-    networks: [ app-net ]
     depends_on:
       - api
 
@@ -110,6 +109,3 @@ services:
     #   interval: 5s
     #   timeout: 3s
     #   retries: 10
-
-networks:
-  app-net: {}

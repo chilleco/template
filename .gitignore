@@ -5,6 +5,8 @@ __pycache__/
 *.py[cod]
 .venv/
 .next/
+node_modules/
+package-lock.json
 *.log
 
 # Celery Beat schedule files

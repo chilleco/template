@@ -1,14 +1,15 @@
 # backend/app/models/post.py
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Integer, String, Text, ForeignKey, DateTime, func
-from .base import Base  # Base = declarative_base()
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime
+from sqlalchemy.orm import relationship
+from datetime import datetime
+from .user import Base
 
 class Post(Base):
     __tablename__ = "posts"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    title: Mapped[str] = mapped_column(String(200), index=True)
-    content: Mapped[str] = mapped_column(Text)
-    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    id = Column(Integer, primary_key=True)
+    title = Column(String(200), nullable=False, index=True)
+    content = Column(Text, nullable=False)
+    author_id = Column(Integer, ForeignKey('users.id'))
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     author = relationship("User", back_populates="posts")

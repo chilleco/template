@@ -8,19 +8,28 @@
     "lint": "next lint --fix"
   },
   "dependencies": {
+    "@hookform/resolvers": "^3.3.2",
     "@tailwindcss/forms": "^0.5.3",
+    "autoprefixer": "^10.4.21",
+    "axios": "^1.6.2",
+    "lucide-react": "^0.294.0",
     "next": "13.4.12",
+    "next-themes": "^0.4.6",
+    "postcss": "^8.5.6",
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "react-hook-form": "^7.48.2",
+    "sonner": "^1.2.4",
+    "tailwindcss": "^3.4.17",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/node": "24.2.1",
     "@types/react": "19.1.10",
-    "autoprefixer": "10.x",
     "eslint": "8.x",
-    "postcss": "8.x",
     "prettier": "3.x",
-    "tailwindcss": "3.x",
+    "tailwindcss-animate": "^1.0.7",
+    "tailwindcss-radix": "^2.8.0",
     "typescript": "5.1.3"
   }
 }
