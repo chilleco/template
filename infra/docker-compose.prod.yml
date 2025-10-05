@@ -1,0 +1,54 @@
+version: '3.9'
+
+services:
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - '80:80'
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - frontend
+
+  backend:
+    image: ghcr.io/your-org/ai-template-backend:latest
+    env_file:
+      - ../.env.example
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+
+  worker:
+    image: ghcr.io/your-org/ai-template-backend:latest
+    command: python -m app.tasks.worker
+    env_file:
+      - ../.env.example
+
+  frontend:
+    image: ghcr.io/your-org/ai-template-frontend:latest
+    environment:
+      NEXT_PUBLIC_API_URL: https://your-domain.com/api/v1
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:

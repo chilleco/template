@@ -1,111 +1,85 @@
+"""User domain model and related database tables."""
+
 from __future__ import annotations
 
-import uuid
-from datetime import datetime
-from typing import TYPE_CHECKING
+import enum
+from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, LargeBinary, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
+from app.db.base import Base
 
-if TYPE_CHECKING:  # pragma: no cover
-    from app.models.post import Post
+
+class AuthProvider(enum.StrEnum):
+    PASSWORD = "password"
+    GOOGLE = "google"
+    GITHUB = "github"
+    APPLE = "apple"
+    TELEGRAM = "telegram"
+    PHONE = "phone"
+
+
+class UserRole(enum.StrEnum):
+    SUPERADMIN = "superadmin"
+    ADMIN = "admin"
+    EDITOR = "editor"
+    CREATOR = "creator"
+    USER = "user"
+    RESTRICTED = "restricted"
+
+
+class UserStatus(enum.StrEnum):
+    ACTIVE = "active"
+    PENDING = "pending"
+    BLOCKED = "blocked"
+    DELETED = "deleted"
 
 
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
-    phone_e164: Mapped[str | None] = mapped_column(String(32), unique=True, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, index=True)
+    phone: Mapped[str | None] = mapped_column(String(32), unique=True, index=True)
     username: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
-    hashed_password: Mapped[str | None] = mapped_column(String(255))
-    full_name: Mapped[str | None]
-    locale: Mapped[str] = mapped_column(String(8), default="en")
-    timezone: Mapped[str] = mapped_column(String(64), default="UTC")
 
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
-    banned_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    hashed_password: Mapped[str | None] = mapped_column(Text, nullable=True)
+    password_salt: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
 
-    metadata: Mapped[dict] = mapped_column(JSONB, default=dict)
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.USER, nullable=False)
+    status: Mapped[UserStatus] = mapped_column(Enum(UserStatus), default=UserStatus.PENDING, nullable=False)
 
-    providers: Mapped[list["UserProviderAccount"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
+    is_email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    profile: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    settings: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
+
+    # relationships
+    posts: Mapped[list["Post"]] = relationship(back_populates="author", cascade="all,delete-orphan")
+
+    __table_args__ = (
+        Index("ix_users_email_phone", "email", "phone"),
     )
-    sessions: Mapped[list["UserSession"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    roles: Mapped[list["UserRole"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    posts: Mapped[list["Post"]] = relationship(back_populates="author", cascade="all, delete-orphan")
 
 
-class UserProviderAccount(Base):
-    __tablename__ = "user_providers"
-    __table_args__ = (UniqueConstraint("provider", "provider_account_id", name="uq_user_provider"),)
+class UserLoginActivity(Base):
+    __tablename__ = "user_login_activities"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    provider: Mapped[str] = mapped_column(String(64))
-    provider_account_id: Mapped[str] = mapped_column(String(255))
-    access_token: Mapped[str | None]
-    refresh_token: Mapped[str | None]
-    scopes: Mapped[list[str]] = mapped_column(JSONB, default=list)
-    data: Mapped[dict] = mapped_column(JSONB, default=dict)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    provider: Mapped[AuthProvider] = mapped_column(Enum(AuthProvider), nullable=False)
+    ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    metadata: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
 
-    user: Mapped[User] = relationship(back_populates="providers")
+    user: Mapped["User"] = relationship(backref="login_activities")
 
 
-class UserSession(Base):
-    __tablename__ = "user_sessions"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
-    pre_auth_token: Mapped[str] = mapped_column(String(256), unique=True, index=True)
-    data: Mapped[dict] = mapped_column(JSONB, default=dict)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-
-    user: Mapped[User | None] = relationship(back_populates="sessions")
-
-
-class Role(Base):
-    __tablename__ = "roles"
-    __table_args__ = (UniqueConstraint("slug"),)
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = mapped_column(String(128), unique=True)
-    slug: Mapped[str] = mapped_column(String(128), unique=True)
-    description: Mapped[str | None]
-
-    permissions: Mapped[list["RolePermission"]] = relationship(
-        back_populates="role", cascade="all, delete-orphan"
-    )
-    users: Mapped[list["UserRole"]] = relationship(back_populates="role", cascade="all, delete-orphan")
-
-
-class RolePermission(Base):
-    __tablename__ = "role_permissions"
-    __table_args__ = (UniqueConstraint("role_id", "permission"),)
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"))
-    permission: Mapped[str] = mapped_column(String(128))
-
-    role: Mapped["Role"] = relationship(back_populates="permissions")
-
-
-class UserRole(Base):
-    __tablename__ = "user_roles"
-    __table_args__ = (UniqueConstraint("user_id", "role_id"),)
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"))
-
-    user: Mapped["User"] = relationship(back_populates="roles")
-    role: Mapped["Role"] = relationship(back_populates="users")
+from app.models.post import Post  # noqa: E402  circular dependency fix

@@ -1,104 +1,67 @@
+"""User-facing schemas."""
+
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
-from typing import Literal
 
-from pydantic import EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field
 
-from app.schemas.base import APIModel
-
-
-class UserBase(APIModel):
-    id: uuid.UUID
-    email: EmailStr | None
-    phone_e164: str | None
-    username: str | None
-    full_name: str | None
-    locale: str
-    timezone: str
-    is_active: bool
-    is_verified: bool
-    is_superuser: bool
-    banned_until: datetime | None
+from app.models.user import AuthProvider, UserRole, UserStatus
+from app.schemas.common import TimestampedSchema
 
 
-class UserRead(UserBase):
-    roles: list[str] = Field(default_factory=list)
-    permissions: list[str] = Field(default_factory=list)
-
-
-class UserCreatePassword(APIModel):
-    email: EmailStr
-    password: str
-    full_name: str | None = None
-
-
-class UserLoginPassword(APIModel):
-    email: EmailStr
-    password: str
-
-
-class UserCreateOAuth(APIModel):
-    provider: str
-    provider_token: str
+class UserBase(BaseModel):
+    id: int
     email: EmailStr | None = None
+    phone: str | None = None
+    username: str | None = None
+    role: UserRole
+    status: UserStatus
+    is_email_verified: bool
+    is_phone_verified: bool
+    locale: str | None = Field(None, description="Preferred locale code")
+    profile: dict
+    settings: dict
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
-class UserCreatePhone(APIModel):
-    phone_e164: str
-    otp_code: str
+class UserPublic(UserBase):
+    pass
 
 
-class UserUpdate(APIModel):
-    full_name: str | None = None
-    locale: str | None = None
-    timezone: str | None = None
+class UserCreatePassword(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    username: str | None = None
 
 
-class TokenPair(APIModel):
+class UserCreatePhone(BaseModel):
+    phone: str = Field(min_length=8, max_length=32)
+    code: str = Field(min_length=4, max_length=8)
+    username: str | None = None
+
+
+class UserLogin(BaseModel):
+    identifier: str
+    password: str | None = None
+    provider: AuthProvider = AuthProvider.PASSWORD
+
+
+class TokenPair(BaseModel):
     access_token: str
     refresh_token: str
-    token_type: Literal["bearer"] = "bearer"
+    token_type: str = "bearer"
 
 
-class TokenRefreshRequest(APIModel):
+class SessionSnapshot(BaseModel):
+    snapshot_id: str
+    expires_in: int
+    payload: dict
+
+
+class TokenRefresh(BaseModel):
     refresh_token: str
-
-
-class SessionState(APIModel):
-    token: str
-    expires_at: datetime
-    data: dict = Field(default_factory=dict)
-
-class SessionBootstrapRequest(APIModel):
-    token: str | None = None
-    data: dict = Field(default_factory=dict)
-
-
-class AuthResponse(APIModel):
-    user: UserRead
-    tokens: TokenPair
-    session: SessionState
-
-
-class PreAuthState(APIModel):
-    token: str
-    expires_at: datetime
-    data: dict = Field(default_factory=dict)
-
-
-class ProviderLink(APIModel):
-    provider: str
-    authorize_url: str
-
-
-class AccessRule(APIModel):
-    slug: str
-    description: str
-
-
-class RoleRead(APIModel):
-    name: str
-    slug: str
-    permissions: list[str]

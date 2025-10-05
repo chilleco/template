@@ -1,50 +1,49 @@
+"""Post schemas used for CRUD operations."""
+
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
-from app.models.post import PostVisibility
-from app.schemas.base import APIModel
+from app.models.post import PostStatus, PostVisibility
 
 
-class PostBase(APIModel):
-    id: uuid.UUID
+class PostBase(BaseModel):
     title: str
-    slug: str
-    summary: str | None
-    content: str
-    locale: str
-    visibility: PostVisibility
-    is_published: bool
-    published_at: datetime | None
-
-
-class PostCreate(APIModel):
-    title: str
-    slug: str
     summary: str | None = None
     content: str
-    locale: str = "en"
-    visibility: PostVisibility = Field(default=PostVisibility.PRIVATE)
-    publish: bool = False
+    visibility: PostVisibility = PostVisibility.PUBLIC
+    status: PostStatus = PostStatus.DRAFT
+    locale: str = Field(default="en", min_length=2, max_length=10)
+    seo: dict = Field(default_factory=dict)
+    extra: dict = Field(default_factory=dict)
+    is_featured: bool = False
 
 
-class PostUpdate(APIModel):
-    slug: str
+class PostCreate(PostBase):
+    slug: str = Field(min_length=3, max_length=255)
+
+
+class PostUpdate(BaseModel):
     title: str | None = None
     summary: str | None = None
     content: str | None = None
-    locale: str | None = None
     visibility: PostVisibility | None = None
-    publish: bool | None = None
+    status: PostStatus | None = None
+    locale: str | None = None
+    seo: dict | None = None
+    extra: dict | None = None
+    is_featured: bool | None = None
 
 
-class PostRead(PostBase):
-    author_id: uuid.UUID | None
+class PostPublic(PostBase):
+    id: int
+    slug: str
+    author_id: int
+    published_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
 
-
-class PostListResponse(APIModel):
-    items: list[PostRead]
-    meta: PaginationMeta
+    class Config:
+        from_attributes = True

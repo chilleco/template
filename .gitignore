@@ -1,43 +1,33 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
+# Global
+.DS_Store
 .env
 .env.*
-.python-version
-.mypy_cache/
+*.log
+__pycache__/
+*.py[cod]
 .pytest_cache/
 .coverage
-coverage.xml
 htmlcov/
-
-# Node
 node_modules/
 .next/
-.next-*/
-yarn.lock
-pnpm-lock.yaml
-package-lock.json
-.next-turbo/
-
-# Logs
-logs/
-*.log
-
-# Editors
-.idea/
+.dist/
 .vscode/
-*.swp
-.DS_Store
-
-# Docker
-backend/.venv
-backend/.cache
-frontend/.turbo
-frontend/.next
-
-# Misc
+.idea/
 .cache/
-.tmp/
-.sentryclirc
+.mypy_cache/
+.sass-cache/
+
+# Backend
+backend/.venv/
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/.coverage
+backend/coverage.xml
+backend/.hypothesis/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/coverage/
+frontend/.turbo/
+frontend/.swc/

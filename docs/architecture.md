@@ -1,56 +1,61 @@
-# Architecture Overview
+# AI-Native Project Template Architecture
 
-## Monorepo layout
+This repository provides an opinionated, but extensible, mono-repo baseline for teams shipping AI-assisted products. It combines a FastAPI backend, Next.js frontend, and infrastructure glue (Docker, GitHub Actions, NGINX) that are tuned for iterative development with copilots such as Codex CLI and Claude Code.
+
+## High-Level Layout
 
 ```
-.
-├── backend/              # FastAPI application, async task workers, Alembic migrations
-├── frontend/             # Next.js 14 app router project with Tailwind/shadcn/Redux
-├── infrastructure/       # Container orchestration assets (NGINX, Docker)
-├── docs/                 # Architecture and AI collaboration guides
-├── docker-compose.yml    # Local/dev orchestration
-├── Makefile              # Common automation entry points
-└── .github/workflows/    # CI/CD pipelines
+backend/   # FastAPI service with async task engine, auth, RBAC, integrations
+frontend/  # Next.js app router project with theming, i18n, Redux Toolkit
+infra/     # Docker, NGINX, and Swarm deployment manifests
+scripts/   # Utility scripts for local DX and CI hooks
+docs/      # Architectural decisions, AI workflow playbooks, onboarding
 ```
 
-## Backend services
+## Core Principles
 
-- **FastAPI** with modular routers (`app/api`) and domain-driven services (`app/services`).
-- **SQLAlchemy 2.0** async stack targeting PostgreSQL/asyncpg; migrations via Alembic.
-- **Authentication** supports password, future OAuth/OTP providers, pre-auth session tokens, and RBAC policies.
-- **Redis + Arq** handles async workloads with scheduled, event-driven, and continuous task patterns.
-- **Loguru + Sentry** power structured logging and error observability across HTTP, workers, and websockets.
-- **Client abstraction layer** (`app/clients`) standardises integration with external APIs (payments, messaging, etc.).
-- **Universal POST-only API** emphasises typed request/response contracts for multi-channel clients (web, bots, mobile).
+- **AI-ready** – Stable, predictable scaffolding so LLMs can inspect context and generate features with minimal friction.
+- **Security & compliance** – Opinionated defaults for authentication, authorization, audit trails, error reporting, and secret management.
+- **Scalability without ceremony** – Clean layering, dependency injection via FastAPI, minimal global state, and async-first networking.
+- **Multi-tenant delivery** – Unified API consumed by web, mobile, and bots with typed contracts shared to the frontend (zod) and external consumers (OpenAPI).
+- **Productivity** – Hot reload in dev, reproducible Docker builds, typed tooling, and test harnesses for rapid feedback.
 
-## Frontend platform
+## Backend Highlights
 
-- Next.js App Router with React Server Components, co-located feature modules, and SEO-friendly marketing surfaces.
-- Tailwind CSS + shadcn/ui + Radix provide accessible UI primitives with a themeable design system.
-- Redux Toolkit stores security/identity state; TanStack Query orchestrates server communication.
-- Localisation (Next Intl), theming (next-themes), and responsive-first component design ensure multi-market readiness.
-- Type-safe bindings to backend generated through `openapi-typescript` + backend export script.
+- FastAPI with `sqlalchemy 2.x` async ORM, PostgreSQL, and Redis.
+- Loguru logging, Sentry tracing, and structured task instrumentation.
+- Authentication flow supporting password, social/OAuth placeholders, and pre-auth session snapshots stored in Redis.
+- Role-based access control (RBAC) service and policy helpers for route guards.
+- Async task registry with periodic, sequential, and event-driven jobs runnable in-process or by a separate worker.
+- Base HTTP client abstraction for integrating external providers (payments, messaging, etc.).
+- Alembic migrations seeded with `users`, `posts`, and login audit trails.
 
-## Async task orchestration
+## Frontend Highlights
 
-Three task archetypes defined in `app/tasks`:
+- Next.js App Router, React 18, and TypeScript with strict mode.
+- Shared providers for Redux Toolkit, React Query, theming, and localization.
+- Radix UI primitives and shadcn-inspired UI kit to stay accessible and theme-ready.
+- Mobile-first, universal components for landing, posts, dashboard, and auth flows.
+- Localization scaffold for five locales with `next-intl`.
+- Vitest + Testing Library harness for unit tests; extends easily to Playwright for e2e.
 
-- `ScheduledTask`: cron-style jobs (e.g., session cleanup) executed via Arq cron definitions.
-- `EventTask`: ad-hoc workloads triggered by API events, queueable for scale-out processing.
-- `ContinuousTask`: long-running loops for polling third-party systems or pipelines.
+## Infrastructure Highlights
 
-## Realtime messaging
+- Dockerfiles for backend and frontend with multi-stage builds.
+- `docker-compose.yml` for local dev and integration testing (backend + frontend + Postgres + Redis).
+- Production-oriented compose stack for Docker Swarm with NGINX reverse proxy and certbot hook points.
+- GitHub Actions workflows for linting, testing, Docker image publishing, and Swarm deployment.
 
-`app/utils/realtime.py` maintains websocket sessions and broadcast helpers, allowing background tasks to push updates (e.g., job completions) to connected clients.
+## AI Workflow Guardrails
 
-## Observability & resilience
+The [AI_WORKFLOW](./AI_WORKFLOW.md) guide documents a repeatable flow for copilots: inspect repo → plan → sync models/migrations → generate backend code/tests → emit OpenAPI/TS schemas → build frontend → verify localization/theme/accessibility → run tests/linters. Prompts in that doc explicitly reference repo structure so AI models stay on track.
 
-- Loguru structured logging with contextual bindings.
-- Sentry instrumentation across FastAPI, SQLAlchemy, Redis, and front-end with release environments.
-- Centralised error handler ensures redaction while preserving traceability.
+## Extending the Template
 
-## Deployment targets
+- Add new domains under `backend/app/models` + `schemas` + `api/v1/routes` with matching migrations.
+- Mirror data contracts in `frontend/lib/schemas` (or generate via tooling).
+- Register background jobs in `backend/app/tasks/jobs.py` using the `@periodic_task`, `@event_handler`, or `@sequential_task` decorators.
+- Drop integration clients into `backend/app/clients` and corresponding service abstractions under `backend/app/services`.
+- Wire additional CI stages in `.github/workflows/ci.yml` and extend Docker stacks under `infra/`.
 
-- Docker Compose for local/dev parity.
-- Dockerfiles for backend/worker/frontend to support Swarm/Kubernetes rollouts behind NGINX ingress.
-- GitHub Actions workflow templates for CI (lint/test) and CD (image builds, swarm deploy placeholders).
+Adopt this baseline as-is or fork and adapt the conventions to your team. Every module includes docstrings and minimal comments designed to help AI agents understand intent without getting lost in implementation noise.

@@ -1,158 +1,160 @@
+"""Authentication and session orchestration services."""
+
 from __future__ import annotations
 
-import secrets
+import json
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
-from fastapi import HTTPException, status
+from fastapi import Depends, Request
+from redis.asyncio import Redis
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.clients.redis import get_redis
+from app.core.config import settings
 from app.core.security import (
     create_access_token,
-    create_pre_auth_token,
     create_refresh_token,
-    hash_password,
+    decode_token,
+    get_password_hash,
     verify_password,
 )
-from app.core.settings import settings
-from app.models.user import Role, RolePermission, User, UserRole, UserSession
-from app.schemas.user import AuthResponse, PreAuthState, SessionState, TokenPair, UserRead
-from app.services.access import AccessService, DEFAULT_PERMISSIONS
+from app.db.session import get_session
+from app.models.user import AuthProvider, User, UserRole, UserStatus
+from app.schemas.user import (
+    SessionSnapshot,
+    TokenPair,
+    TokenRefresh,
+    UserCreatePassword,
+    UserLogin,
+)
+from app.tasks.registry import task_registry
+
+
+SNAPSHOT_PREFIX = "session:snapshot"
+REFRESH_TOKEN_PREFIX = "session:refresh"
+
+
+class AuthError(Exception):
+    pass
 
 
 class AuthService:
-    def __init__(self, session: AsyncSession):
+    def __init__(
+        self,
+        request: Request,
+        session: AsyncSession,
+        redis: Redis,
+    ) -> None:
+        self.request = request
         self.session = session
+        self.redis = redis
 
-    async def bootstrap_default_roles(self) -> None:
-        result = await self.session.execute(select(Role))
-        if result.first():
-            return
-        admin_role = Role(name="Administrator", slug="admin")
-        editor_role = Role(name="Editor", slug="editor")
-        viewer_role = Role(name="Viewer", slug="viewer")
-        self.session.add_all([admin_role, editor_role, viewer_role])
-        await self.session.flush()
-
-        def assign(role: Role, permissions: set[str]) -> None:
-            for perm in permissions:
-                self.session.add(RolePermission(role_id=role.id, permission=perm))
-
-        assign(admin_role, DEFAULT_PERMISSIONS)
-        assign(
-            editor_role,
-            {
-                "post:create",
-                "post:update",
-                "post:publish",
-                "analytics:view",
-            },
+    async def register_password_user(self, payload: UserCreatePassword) -> User:
+        user = User(
+            email=payload.email.lower(),
+            username=payload.username,
+            hashed_password=get_password_hash(payload.password),
+            status=UserStatus.ACTIVE,
+            role=UserRole.USER,
+            profile={"locale": settings.default_locale},
+            settings={"notifications": True},
         )
-        assign(viewer_role, {"post:read"})
-
-    async def ensure_pre_auth_session(self, token: str | None, data: dict | None = None) -> PreAuthState:
-        now = datetime.now(timezone.utc)
-        if token:
-            query = select(UserSession).where(UserSession.pre_auth_token == token)
-            existing = (await self.session.execute(query)).scalar_one_or_none()
-            if existing and existing.expires_at > now:
-                if data:
-                    existing.data.update(data)
-                    await self.session.flush()
-                return PreAuthState(token=existing.pre_auth_token, expires_at=existing.expires_at, data=existing.data)
-
-        pre_auth_token = create_pre_auth_token(secrets.token_urlsafe(32))
-        expires_at = now + timedelta(minutes=settings.pre_auth_token_expire_minutes)
-        session = UserSession(pre_auth_token=pre_auth_token, data=data or {}, expires_at=expires_at)
-        self.session.add(session)
-        await self.session.flush()
-        return PreAuthState(token=pre_auth_token, expires_at=expires_at, data=session.data)
-
-    async def register_local_user(self, *, email: str, password: str, full_name: str | None, session_token: str) -> AuthResponse:
-        existing = await self._get_user_by_email(email)
-        if existing:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="email_already_registered")
-
-        user = User(email=email, hashed_password=hash_password(password), full_name=full_name, is_active=True)
         self.session.add(user)
-        await self.session.flush()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise AuthError("User already exists") from exc
+        await self.session.refresh(user)
+        await task_registry.emit("user.registered", {"user_id": user.id})
+        return user
 
-        await self._attach_session_to_user(session_token=session_token, user=user)
-        return await self._issue_auth_bundle(user, session_token)
-
-    async def authenticate_local(self, *, email: str, password: str, session_token: str) -> AuthResponse:
-        user = await self._get_user_by_email(email)
-        if not user or not user.hashed_password:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials")
-        if not verify_password(password, user.hashed_password):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials")
-        await self._assert_user_allowed(user)
-        await self._attach_session_to_user(session_token=session_token, user=user)
-        return await self._issue_auth_bundle(user, session_token)
-
-    async def rotate_tokens(self, refresh_token: str) -> TokenPair:
-        payload = self._decode(refresh_token)
-        if not payload or payload.get("type") != "refresh":
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token")
-        user = await self.session.get(User, uuid.UUID(payload["sub"]))
+    async def authenticate(self, payload: UserLogin) -> TokenPair:
+        identifier = payload.identifier.lower()
+        stmt = select(User).where(
+            (User.email == identifier) | (User.username == identifier) | (User.phone == identifier)
+        )
+        result = await self.session.execute(stmt)
+        user: User | None = result.scalars().first()
         if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user_not_found")
-        await self._assert_user_allowed(user)
-        return TokenPair(access_token=create_access_token(str(user.id)), refresh_token=create_refresh_token(str(user.id)))
+            raise AuthError("User not found")
 
-    async def _issue_auth_bundle(self, user: User, session_token: str) -> AuthResponse:
-        tokens = TokenPair(
-            access_token=create_access_token(str(user.id)),
-            refresh_token=create_refresh_token(str(user.id)),
+        if payload.provider == AuthProvider.PASSWORD:
+            if not user.hashed_password or not payload.password:
+                raise AuthError("Password required")
+            if not verify_password(payload.password, user.hashed_password):
+                raise AuthError("Invalid credentials")
+
+        if user.status != UserStatus.ACTIVE:
+            raise AuthError(f"User is {user.status}")
+
+        token_pair = await self._issue_tokens(str(user.id))
+        return token_pair
+
+    async def refresh(self, payload: TokenRefresh) -> TokenPair:
+        try:
+            payload_data = decode_token(payload.refresh_token)
+        except ValueError as exc:  # noqa: TRY003
+            raise AuthError("Invalid refresh token") from exc
+
+        if payload_data.get("type") != "refresh":
+            raise AuthError("Invalid token type")
+
+        stored = await self.redis.get(f"{REFRESH_TOKEN_PREFIX}:{payload.refresh_token}")
+        if stored != payload.refresh_token:
+            raise AuthError("Refresh token revoked")
+
+        subject = payload_data["sub"]
+        return await self._issue_tokens(subject)
+
+    async def get_current_user(self) -> User | None:
+        auth_header = self.request.headers.get("Authorization")
+        if not auth_header or not auth_header.lower().startswith("bearer "):
+            return None
+        token = auth_header.split()[1]
+        try:
+            payload = decode_token(token)
+        except ValueError:
+            return None
+        if payload.get("type") != "access":
+            return None
+
+        stmt = select(User).where(User.id == int(payload["sub"]))
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def snapshot_session(self, data: dict) -> SessionSnapshot:
+        snapshot_id = uuid.uuid4().hex
+        expires = settings.security_session_token_ttl_minutes * 60
+        key = f"{SNAPSHOT_PREFIX}:{snapshot_id}"
+        await self.redis.set(key, json.dumps(data), ex=expires)
+        return SessionSnapshot(snapshot_id=snapshot_id, expires_in=expires, payload=data)
+
+    async def consume_snapshot(self, snapshot_id: str) -> dict:
+        key = f"{SNAPSHOT_PREFIX}:{snapshot_id}"
+        data = await self.redis.get(key)
+        if not data:
+            return {}
+        await self.redis.delete(key)
+        return json.loads(data)
+
+    async def _issue_tokens(self, subject: str) -> TokenPair:
+        access = create_access_token(subject)
+        refresh = create_refresh_token(subject)
+        await self.redis.setex(
+            f"{REFRESH_TOKEN_PREFIX}:{refresh}",
+            settings.refresh_token_expire_minutes * 60,
+            refresh,
         )
-        session_state = await self.ensure_pre_auth_session(session_token)
-        user_read = await self._user_to_schema(user)
-        return AuthResponse(user=user_read, tokens=tokens, session=SessionState(**session_state.model_dump()))
+        return TokenPair(access_token=access, refresh_token=refresh)
 
-    async def _attach_session_to_user(self, *, session_token: str, user: User) -> None:
-        query = select(UserSession).where(UserSession.pre_auth_token == session_token)
-        session = (await self.session.execute(query)).scalar_one_or_none()
-        if session:
-            session.user_id = user.id
-            await self.session.flush()
-            return
 
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.pre_auth_token_expire_minutes)
-        session = UserSession(pre_auth_token=session_token, user_id=user.id, data={}, expires_at=expires_at)
-        self.session.add(session)
-        await self.session.flush()
-
-    async def _user_to_schema(self, user: User) -> UserRead:
-        permissions = sorted(AccessService(user).user_permissions())
-        roles = [role.slug for role in user.roles]
-        return UserRead(
-            id=user.id,
-            email=user.email,
-            phone_e164=user.phone_e164,
-            username=user.username,
-            full_name=user.full_name,
-            locale=user.locale,
-            timezone=user.timezone,
-            is_active=user.is_active,
-            is_verified=user.is_verified,
-            is_superuser=user.is_superuser,
-            banned_until=user.banned_until,
-            roles=roles,
-            permissions=permissions,
-        )
-
-    async def _get_user_by_email(self, email: str) -> User | None:
-        result = await self.session.execute(select(User).where(User.email == email))
-        return result.scalar_one_or_none()
-
-    def _decode(self, token: str) -> dict | None:
-        from app.core.security import decode_token
-
-        return decode_token(token)
-
-    async def _assert_user_allowed(self, user: User) -> None:
-        if not user.is_active:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="user_inactive")
-        if user.banned_until and user.banned_until > datetime.now(timezone.utc):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="user_banned")
+async def get_auth_service(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    redis: Redis = Depends(get_redis),
+) -> AuthService:
+    return AuthService(request=request, session=session, redis=redis)

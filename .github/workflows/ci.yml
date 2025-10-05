@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
 
 jobs:
   backend:
@@ -12,28 +13,38 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v1
         with:
-          version: "0.2.x"
-      - name: Install backend deps
-        working-directory: backend
-        run: uv pip install .[dev]
-      - name: Lint & test backend
-        working-directory: backend
+          python-version: '3.12'
+      - name: Install deps
         run: |
-          uv run ruff check .
-          uv run pytest --cov=app
+          cd backend
+          uv sync
+      - name: Lint
+        run: |
+          cd backend
+          uv run ruff check app tests
+      - name: Test
+        run: |
+          cd backend
+          uv run pytest
+
   frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - name: Install frontend deps
-        working-directory: frontend
-        run: npm install
+          node-version: '20'
+          cache: 'pnpm'
+      - name: Install deps
+        run: |
+          cd frontend
+          corepack enable pnpm
+          pnpm install
       - name: Lint
-        working-directory: frontend
-        run: npm run lint
+        run: |
+          cd frontend
+          pnpm lint
       - name: Tests
-        working-directory: frontend
-        run: npm run test -- --run
+        run: |
+          cd frontend
+          pnpm test -- --run

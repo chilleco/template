@@ -1,18 +1,16 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import Providers from "./providers";
+import './globals.css';
+
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: "AI Ready Template",
-  description: "Production-grade starter optimized for AI-assisted development"
+  title: 'AI Native Project Template',
+  description: 'Full-stack baseline tuned for AI-assisted development workflows.'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
-        <Providers>{children}</Providers>
-      </body>
+    <html suppressHydrationWarning lang="en">
+      <body>{children}</body>
     </html>
   );
 }

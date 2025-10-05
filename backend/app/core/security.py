@@ -1,69 +1,49 @@
+"""Security helpers for hashing passwords and issuing JWT tokens."""
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.core.settings import settings
+from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-class TokenSubject:
-    ACCESS = "access"
-    REFRESH = "refresh"
-    PRE_AUTH = "pre_auth"
-
-
-def _create_token(subject: str, token_type: str, expires_delta: timedelta, data: Dict[str, Any]) -> str:
-    payload = {
-        "sub": subject,
-        "type": token_type,
-        "exp": datetime.now(timezone.utc) + expires_delta,
-        **data,
-    }
-    return jwt.encode(payload, settings.secret_key, algorithm="HS256")
-
-
-def create_access_token(subject: str, data: Dict[str, Any] | None = None) -> str:
-    return _create_token(
-        subject,
-        TokenSubject.ACCESS,
-        timedelta(minutes=settings.access_token_expire_minutes),
-        data or {},
-    )
-
-
-def create_refresh_token(subject: str, data: Dict[str, Any] | None = None) -> str:
-    return _create_token(
-        subject,
-        TokenSubject.REFRESH,
-        timedelta(minutes=settings.refresh_token_expire_minutes),
-        data or {},
-    )
-
-
-def create_pre_auth_token(session_id: str, data: Dict[str, Any] | None = None) -> str:
-    return _create_token(
-        session_id,
-        TokenSubject.PRE_AUTH,
-        timedelta(minutes=settings.pre_auth_token_expire_minutes),
-        data or {},
-    )
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def hash_password(password: str) -> str:
+def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def decode_token(token: str) -> Dict[str, Any] | None:
+def create_token(subject: str, expires_delta: timedelta, token_type: str) -> str:
+    now = datetime.now(UTC)
+    payload = {
+        "sub": subject,
+        "iat": int(now.timestamp()),
+        "exp": int((now + expires_delta).timestamp()),
+        "type": token_type,
+    }
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def create_access_token(subject: str) -> str:
+    expires_delta = timedelta(minutes=settings.access_token_expire_minutes)
+    return create_token(subject, expires_delta, token_type="access")
+
+
+def create_refresh_token(subject: str) -> str:
+    expires_delta = timedelta(minutes=settings.refresh_token_expire_minutes)
+    return create_token(subject, expires_delta, token_type="refresh")
+
+
+def decode_token(token: str) -> dict[str, Any]:
     try:
-        return jwt.decode(token, settings.secret_key, algorithms=["HS256"])
-    except JWTError:
-        return None
+        return jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+    except JWTError as exc:  # noqa: TRY003
+        raise ValueError("Invalid token") from exc

@@ -1,14 +1,15 @@
-import { withSentryConfig } from "@sentry/nextjs";
+import createNextIntlPlugin from 'next-intl/plugin';
+
+const withNextIntl = createNextIntlPlugin('./config/i18n.ts');
 
 const nextConfig = {
-  experimental: {
-    serverActions: true
-  },
   reactStrictMode: true,
-  i18n: {
-    locales: ["en", "ru", "es", "zh", "ar"],
-    defaultLocale: "en"
+  experimental: {
+    serverActions: true,
+  },
+  eslint: {
+    dirs: ['app', 'components', 'features', 'lib', 'store', 'config']
   }
 };
 
-export default withSentryConfig(nextConfig, { silent: true });
+export default withNextIntl(nextConfig);

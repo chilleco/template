@@ -1,114 +1,62 @@
-# Project Template: AI-Ready Web Platform
+# AI-Native Project Template
 
-## Why This Template
-
-This repository is a production-grade starter kit for building modern, AI-assisted products that need to scale from MVP to enterprise. It packages opinionated best practices so humans and code-generation agents can collaborate without re-architecting the stack for every new idea (SEO content site, e-commerce, trading bot control plane, Telegram mini app, fintech dashboard, etc.).
-
-## Highlights
-
-- **Full-stack, batteries-included**: FastAPI + PostgreSQL + Redis backend, Next.js + Tailwind + shadcn/ui frontend, Docker-first infrastructure, and GitHub Actions CI/CD.
-- **AI-aware workflows**: Documentation and scripts guide Codex CLI, Claude Code, and other agents through safe plans—covering migrations, tests, linting, type generation, and deployment considerations.
-- **Secure user platform**: Unified auth (password, future providers), pre-auth session state, and RBAC/permission scaffolding that extend across API, background tasks, and UI routing.
-- **Async & realtime ready**: Redis-backed Arq workers with scheduled/event/continuous jobs, websocket broadcasting for live updates, and patterns for long-running or event-driven integrations.
-- **Multi-channel API**: POST-only JSON endpoints modelled after Stripe/Twitter style APIs to serve web, bots, mobile apps, and external partners consistently.
-- **Observability baked in**: Loguru structured logs and Sentry instrumentation across backend, workers, and frontend.
-
-## Stack Overview
-
-| Area       | Tools & Frameworks |
-|------------|--------------------|
-| Backend    | FastAPI, SQLAlchemy 2.x async, Alembic, PostgreSQL, Redis, Arq, Loguru, Sentry |
-| Frontend   | Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, shadcn/ui, Radix UI, Redux Toolkit, TanStack Query, next-themes |
-| Testing    | Pytest + pytest-asyncio, Vitest + Testing Library |
-| Tooling    | `uv` package manager, Ruff, Prettier, ESLint, openapi-typescript |
-| CI/CD      | GitHub Actions, Docker (backend, worker, frontend images), Docker Swarm-ready configs |
-
-## Repository Layout
-
-```
-.
-├── backend/                # FastAPI app, models, services, tasks, Alembic, tests
-├── frontend/               # Next.js app router project with feature-based organization
-├── infrastructure/         # NGINX config and deployment artefacts
-├── docs/                   # Architecture, AI playbook, operational guides
-├── .github/workflows/      # CI (lint/test) and deploy pipelines
-├── docker-compose.yml      # Local/dev environment orchestration
-├── Makefile                # Common automation tasks
-└── .env.example            # Baseline environment variables
-```
+A batteries-included template for building modern products with AI copilots. It ships a FastAPI backend, Next.js frontend, Dockerized infrastructure, and workflows tuned for Codex CLI or Claude Code assisted development.
 
 ## Quick Start
 
-1. **Clone & configure**
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+make install-backend
+make install-frontend
+make dev-backend
+make dev-frontend
+```
 
-2. **Install dependencies**
-   ```bash
-   make backend-install
-   make frontend-install
-   ```
+Visit `http://localhost:3000` (frontend) and `http://localhost:8000/api/docs` (backend).
 
-3. **Run the stack locally**
-   ```bash
-   make docker-up
-   # Backend available at http://localhost:8000
-   # Frontend available at http://localhost:3000
-   ```
+Alternatively, run the full stack with Docker:
 
-4. **Run database migrations**
-   ```bash
-   cd backend
-   uv run alembic upgrade head
-   ```
+```bash
+docker compose up --build
+```
 
-5. **Generate OpenAPI + TypeScript bindings**
-   ```bash
-   make openapi
-   make schema-types
-   ```
+## Repository Layout
 
-6. **Validate**
-   ```bash
-   make backend-test
-   make frontend-test
-   make lint
-   ```
+- `backend/` – FastAPI service, async task engine, auth, RBAC, integrations.
+- `frontend/` – Next.js App Router app with Tailwind, Redux Toolkit, next-intl, shadcn UI primitives.
+- `infra/` – Docker Swarm and NGINX configs for staging/production.
+- `docs/` – Architecture notes, AI workflow playbook, component overviews.
+- `scripts/` – Utility scripts (OpenAPI export, forthcoming codegen helpers).
 
-## Development Workflow (Human & AI)
+## Features
 
-1. Read `docs/architecture.md` and `docs/ai-playbook.md` to understand domain boundaries and agent workflow expectations.
-2. Use Codex CLI/Claude Code planning output to list migrations, API changes, tests, and frontend impacts before editing.
-3. Implement backend components (models, services, routes) with matching migrations and update schemas/tests.
-4. Export OpenAPI + regenerate TypeScript types, then implement frontend feature slices/components.
-5. Ensure tests and linters are green; update docs if behaviour changes.
+- **Universal API**: JSON-only POST-first API supporting web, mobile, and bot clients.
+- **Auth & RBAC**: Multi-identifier login, JWT access/refresh tokens, Redis-backed session snapshots, role-based permissions.
+- **Background Tasks**: Async registry for periodic, event-driven, and sequential jobs. Redis-backed queue with worker entrypoint.
+- **Observability**: Loguru logging, Sentry hooks, structured error propagation.
+- **Frontend Excellence**: Mobile-first components, dark/light themes, locale routing, React Query caching, Vitest tests.
+- **Infrastructure**: Dockerfiles, Compose, Swarm manifest, GitHub Actions CI (lint + test + build).
+- **AI Workflow Guardrails**: Planning prompts, schema generation scripts, documentation for copilots.
 
-## Key Features Ready to Extend
+## Extending
 
-- **Auth & RBAC**: `backend/app/services/auth.py` and `backend/app/services/access.py` include session bootstrap, token rotation, and role-permission scaffolding.
-- **Content Domain**: User-facing posts module demonstrates patterns for create/update/read, pagination, and permission checks.
-- **Async Tasks**: `backend/app/tasks/` contains examples for scheduled cleanups, event broadcasts, and long-running polls.
-- **Realtime**: `backend/app/api/v1/realtime.py` + `app/utils/realtime.py` provide websocket connection management ready for notifications and progress streams.
-- **Frontend Admin Console**: `/app` routes show how to compose dashboard views, fetch data via `useApiClient`, and respect theme/locale in shared components.
+1. Review docs in `docs/`—especially `ARCHITECTURE.md` and `AI_WORKFLOW.md`.
+2. Implement backend changes (models → migrations → services → routes → tests).
+3. Export OpenAPI (`python scripts/export_openapi.py openapi`) and sync TypeScript schemas.
+4. Build frontend components/hooks, update locales, and cover with tests.
+5. Run `make test-backend`, `make test-frontend`, `make lint-backend`, `make lint-frontend` before committing.
 
 ## Deployment
 
-- **Docker Compose** for local and dev environments.
-- **Dockerfiles** for backend/worker/frontend to publish images (see `.github/workflows/deploy.yml`).
-- Integrate with Docker Swarm, Kubernetes, or other orchestrators by extending the provided workflow steps.
+- Build images: `docker build -t ghcr.io/your-org/ai-template-backend ./backend` and `...-frontend ./frontend`.
+- Push to registry; update tags in `infra/docker-compose.prod.yml`.
+- Deploy via Docker Swarm: `docker stack deploy -c infra/docker-compose.prod.yml ai-template`.
 
-## Observability & Ops
+## Tooling Notes
 
-- Configure `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` to enable Sentry monitoring.
-- Logs emit to stdout via Loguru; attach Docker logging drivers or external collectors as needed.
-- `docs/operations.md` details routine tasks (migrations, type generation, deployment).
+- Python dependency management via `uv`. Create a virtualenv with `uv sync`.
+- Frontend uses `pnpm`; `corepack enable pnpm` before installing dependencies.
+- Code style enforced with Ruff (backend) and ESLint + Prettier (frontend).
 
-## Contributing
+## License
 
-1. Fork and create feature branches.
-2. Follow the AI playbook for planning/testing.
-3. Run `make lint` and tests before opening a PR.
-4. Document migrations, new endpoints, and UI changes in PR summaries.
-
-Ready to build your next AI-assisted product? Start by customising the domain models, hooking up your providers, and letting your coding agents iterate safely within this architecture.
+MIT – customize and adapt freely.

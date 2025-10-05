@@ -1,33 +1,34 @@
 from __future__ import annotations
 
-import pytest
+from fastapi import Request
+from starlette.datastructures import Headers
 
+from app.schemas.user import TokenRefresh, UserCreatePassword, UserLogin
 from app.services.auth import AuthService
 
-pytestmark = pytest.mark.asyncio
+
+def make_request(token: str | None = None) -> Request:
+    headers = []
+    if token:
+        headers.append((b"authorization", f"Bearer {token}".encode()))
+    scope = {"type": "http", "headers": headers}
+    return Request(scope)
 
 
-async def test_register_and_login_flow(db_session):
-    service = AuthService(db_session)
-    await service.bootstrap_default_roles()
-    session_state = await service.ensure_pre_auth_session(None)
+async def test_register_and_login(session, fake_redis):
+    service = AuthService(request=make_request(), session=session, redis=fake_redis)
 
-    registered = await service.register_local_user(
-        email="user@example.com",
-        password="secret123",
-        full_name="Example User",
-        session_token=session_state.token,
-    )
+    user = await service.register_password_user(UserCreatePassword(email="user@example.com", password="StrongPass123!"))
+    assert user.id is not None
 
-    assert registered.user.email == "user@example.com"
-    await db_session.commit()
+    tokens = await service.authenticate(UserLogin(identifier="user@example.com", password="StrongPass123!"))
+    assert tokens.access_token
+    assert tokens.refresh_token
 
-    login_session = await service.ensure_pre_auth_session(registered.session.token)
-    logged_in = await service.authenticate_local(
-        email="user@example.com",
-        password="secret123",
-        session_token=login_session.token,
-    )
+    authorized_service = AuthService(request=make_request(tokens.access_token), session=session, redis=fake_redis)
+    current = await authorized_service.get_current_user()
+    assert current is not None
+    assert current.id == user.id
 
-    assert logged_in.tokens.access_token
-    assert logged_in.user.email == "user@example.com"
+    refreshed = await service.refresh(TokenRefresh(refresh_token=tokens.refresh_token))
+    assert refreshed.access_token != tokens.access_token
