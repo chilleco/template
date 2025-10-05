@@ -1,35 +1,39 @@
-name: CI Pipeline
+name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+
 jobs:
-  build-and-test:
+  backend:
     runs-on: ubuntu-latest
-    services:
-      db:
-        image: postgres:15
-        env:
-          POSTGRES_DB: testdb
-          POSTGRES_USER: testuser
-          POSTGRES_PASSWORD: testpass
-        ports: [5432:5432]
-      redis:
-        image: redis:7
-        ports: [6379:6379]
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v1
         with:
-          python-version: '3.11'
-      - name: Install backend dependencies
-        run: pip install -r backend/requirements.txt
-      - name: Run backend tests
-        env:
-          DATABASE_URL: postgres://testuser:testpass@localhost:5432/testdb
-          REDIS_URL: redis://localhost:6379
-        run: pytest backend/app/tests -q
-      - name: Install frontend dependencies
-        run: npm ci --prefix frontend
-      - name: Run frontend build
-        run: npm run build --prefix frontend
-      - name: Run frontend lint & tests
-        run: npm run test --prefix frontend
+          version: "0.2.x"
+      - name: Install backend deps
+        working-directory: backend
+        run: uv pip install .[dev]
+      - name: Lint & test backend
+        working-directory: backend
+        run: |
+          uv run ruff check .
+          uv run pytest --cov=app
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm install
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+      - name: Tests
+        working-directory: frontend
+        run: npm run test -- --run

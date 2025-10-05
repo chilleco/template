@@ -1,14 +1,43 @@
-.DS_Store
-.env
-/frontend/generated/
+# Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
-.next/
+.env
+.env.*
+.python-version
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Node
 node_modules/
+.next/
+.next-*/
+yarn.lock
+pnpm-lock.yaml
 package-lock.json
+.next-turbo/
+
+# Logs
+logs/
 *.log
 
-# Celery Beat schedule files
-backend/celerybeat-schedule
-backend/celerybeat.pid
+# Editors
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Docker
+backend/.venv
+backend/.cache
+frontend/.turbo
+frontend/.next
+
+# Misc
+.cache/
+.tmp/
+.sentryclirc

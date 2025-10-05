@@ -1,28 +1,38 @@
-import { type Config } from "tailwindcss";
-import animate from "tailwindcss-animate";
-import radix from "tailwindcss-radix";
+import type { Config } from "tailwindcss";
+import { fontFamily } from "tailwindcss/defaultTheme";
 
-export default {
-  content: [
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./entities/**/*.{js,ts,jsx,tsx,mdx}",
-    "./features/**/*.{js,ts,jsx,tsx,mdx}",
-    "./shared/**/*.{js,ts,jsx,tsx,mdx}",
-    "../../backend/templates/**/*.html"
-  ],
+const config: Config = {
+  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  darkMode: ["class", "[data-theme='dark']"],
   theme: {
-    container: { center: true, padding: "1rem" },
     extend: {
       colors: {
-        border: "hsl(var(--border) / <alpha-value>)",
-        background: "hsl(var(--background) / <alpha-value>)",
-        primary: "hsl(var(--primary) / <alpha-value>)",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        card: "hsl(var(--card))",
+        "card-foreground": "hsl(var(--card-foreground))",
+        popover: "hsl(var(--popover))",
+        "popover-foreground": "hsl(var(--popover-foreground))",
+        primary: "hsl(var(--primary))",
+        "primary-foreground": "hsl(var(--primary-foreground))",
+        secondary: "hsl(var(--secondary))",
+        "secondary-foreground": "hsl(var(--secondary-foreground))",
+        muted: "hsl(var(--muted))",
+        "muted-foreground": "hsl(var(--muted-foreground))",
+        accent: "hsl(var(--accent))",
+        "accent-foreground": "hsl(var(--accent-foreground))",
+        destructive: "hsl(var(--destructive))",
+        "destructive-foreground": "hsl(var(--destructive-foreground))",
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))"
       },
-      borderRadius: { lg: "var(--radius)" },
-    },
-    fontFamily: { sans: ["var(--font-sans)", "sans-serif"] },
+      fontFamily: {
+        sans: ["var(--font-sans)", ...fontFamily.sans]
+      }
+    }
   },
-  plugins: [animate, radix],
-} satisfies Config;
+  plugins: [require("tailwindcss-animate")]
+};
+
+export default config;

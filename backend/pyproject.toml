@@ -1,157 +1,87 @@
-[build-system]
-requires = ["hatchling>=1.23"]
-build-backend = "hatchling.build"
-
 [project]
-name = "app"
+name = "ai-ready-backend"
 version = "0.1.0"
-description = ""
-# readme = "README.md"
-requires-python = ">=3.12"
-authors = [{ name = "Alex Poloz", email = "alexypoloz@gmail.com" }]
-# packages = [{include = "app"}]
-
+description = "FastAPI backend template optimized for AI-assisted development"
+readme = "../README.md"
+requires-python = ">=3.11"
 dependencies = [
-  # Web
-  "fastapi>=0.115",
-  "uvicorn[standard]>=0.30",
-
-  # Config / typing
-  "pydantic>=2.7",
-  "pydantic-settings>=2.3",
-
-  # Persistence (SQL)
-  "sqlalchemy[asyncio]>=2.0",
-  "asyncpg>=0.29",
-  "alembic>=1.13",
-
-  # IO / reliability
-  "httpx>=0.27",
-  "tenacity>=8.2",
-  "orjson>=3.9",
-  "redis>=5.0",
-
-  # Observability
-  "prometheus-client>=0.20",
-  "opentelemetry-api>=1.25",
-  "opentelemetry-sdk>=1.25",
-  "opentelemetry-exporter-otlp>=1.25",
-  "opentelemetry-instrumentation-fastapi>=0.46",
+  "fastapi>=0.111.0",
+  "uvicorn[standard]>=0.29.0",
+  "sqlalchemy[asyncio]>=2.0.30",
+  "alembic>=1.13.1",
+  "asyncpg>=0.29.0",
+  "redis>=5.0.4",
+  "arq>=0.23",
+  "loguru>=0.7.2",
+  "python-jose[cryptography]>=3.3.0",
+  "passlib[bcrypt]>=1.7.4",
+  "pydantic>=2.7.1",
+  "pydantic-settings>=2.2.1",
+  "httpx[http2]>=0.27.0",
+  "sentry-sdk[fastapi]>=1.45.0",
+  "pyotp>=2.9.0",
+  "phonenumberslite>=8.13.38",
+  "email-validator>=2.1.1",
+  "orjson>=3.10.0",
+  "itsdangerous>=2.2.0"
 ]
 
 [project.optional-dependencies]
-# Queue backends (pick one or more)
-queue-celery = ["celery>=5.3"]
-queue-dramatiq = ["dramatiq>=1.15", "redis>=5.0"]
-queue-rq = ["rq>=1.15", "redis>=5.0"]
-queue-arq = ["arq>=0.26", "redis>=5.0"]
-
-# Datastores beyond Postgres/SQLAlchemy
-mongo = ["motor>=3.3", "beanie>=1.25"]
-search = ["opensearch-py>=2.4"]
-
-# Console entry points (uv runs these directly: `uv run api`, `uv run worker`, …)
-[project.scripts]
-api = "app.run:serve_api"
-worker = "app.jobs.cli:run_worker"
-scheduler = "app.jobs.cli:run_scheduler"
-# Uncomment when you add a migrations CLI:
-# migrate = "migrations.cli:main"
-
-# Dev / CI toolchain
 dev = [
-  "pytest>=8.2",
-  "pytest-asyncio>=0.23",
-  "anyio>=4.4",
-  "httpx>=0.27",
-  "mypy>=1.9",
-  "ruff>=0.5",
+  "pytest>=8.1.1",
+  "pytest-asyncio>=0.23.6",
+  "pytest-cov>=5.0.0",
+  "httpx>=0.27.0",
+  "faker>=24.4.0",
+  "datamodel-code-generator>=0.25.4",
+  "ruff>=0.4.2",
+  "mypy>=1.9.0",
   "types-redis>=4.6.0.20240425",
-  "import-linter>=2.0",
-  "respx>=0.21",
-  "faker>=19.0",
-  "coverage[toml]>=7.6",
-  "types-python-dateutil>=2.9.0.20240316",
-  "pydantic-extra-types>=2.7",
+  "types-passlib>=1.7.7.20240327",
+  "pre-commit>=3.7.0"
 ]
 
-[project.scripts]
-# ASGI server (uses app/asgi.py)
-api = "app.run:serve_api"
-# Worker / scheduler wrappers (broker selected via $QUEUE_BACKEND: celery|dramatiq|rq|arq)
-worker = "app.jobs.cli:run_worker"
-scheduler = "app.jobs.cli:run_scheduler"
-# If you add a CLI under migrations/cli.py, uncomment the next line:
-# migrate = "migrations.cli:main"
+dynamic = ["classifiers"]
 
-[tool.hatch.build.targets.wheel]
-packages = ["app"]
+[build-system]
+requires = ["hatchling>=1.21.0"]
+build-backend = "hatchling.build"
 
-[tool.hatch.build.targets.sdist]
-include = [
-  "app",
-  "migrations",
-  "README.md",
-  "pyproject.toml",
-]
+[tool.uv]
+managed = true
 
-# ------------------------------
-# QA / Tooling config
-# ------------------------------
+[tool.uv.sources]
+ai-ready-backend = {
+  workspace = true
+}
+
+[tool.uv.workspace]
+members = ["app"]
+
+[tool.uv.defaults]
+index-url = "https://pypi.org/simple"
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
-
-[tool.ruff.lint]
-select = ["E","F","I","B","UP","ASYNC","N","SIM","Q","PL","RUF"]
-ignore = []
-# Treat Alembic env and migration revisions as special; tests may allow prints
-per-file-ignores = {
-  "migrations/**" = ["E402","F401","F403"],
-  "tests/**" = ["S101","PLR2004"],
-}
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-line-ending = "lf"
-
-[tool.mypy]
-python_version = "3.12"
-strict = true
-warn_unused_configs = true
-plugins = ["pydantic.mypy"]
-# Keep frameworks out of domain; allow plugins to resolve pydantic v2
-mypy_path = "."
+select = ["E", "F", "I", "B", "UP", "N", "ASYNC"]
+fix = true
 
 [tool.pytest.ini_options]
-addopts = "-q"
-testpaths = ["tests"]
+minversion = "8.0"
+addopts = "-ra --strict-markers --disable-warnings"
 asyncio_mode = "auto"
+testpaths = [
+  "tests"
+]
 
 [tool.coverage.run]
-branch = true
 source = ["app"]
+branch = true
+omit = ["app/main.py"]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-exclude_lines = [
-  "pragma: no cover",
-  "if __name__ == .__main__.:",
-]
 
-# Optionally keep uv-specific dev groups (works with uv/pip/poetry)
-[tool.uv]
-dev-dependencies = [
-  "pytest",
-  "pytest-asyncio",
-  "httpx",
-  "mypy",
-  "ruff",
-  "import-linter",
-  "respx",
-  "faker",
-  "coverage[toml]",
-]
+[tool.hatch.build]
+packages = ["app"]

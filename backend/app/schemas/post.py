@@ -1,26 +1,50 @@
+from __future__ import annotations
+
+import uuid
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel
+
+from pydantic import Field
+
+from app.models.post import PostVisibility
+from app.schemas.base import APIModel
 
 
-class PostBase(BaseModel):
+class PostBase(APIModel):
+    id: uuid.UUID
     title: str
+    slug: str
+    summary: str | None
     content: str
+    locale: str
+    visibility: PostVisibility
+    is_published: bool
+    published_at: datetime | None
 
 
-class PostCreate(PostBase):
-    pass
+class PostCreate(APIModel):
+    title: str
+    slug: str
+    summary: str | None = None
+    content: str
+    locale: str = "en"
+    visibility: PostVisibility = Field(default=PostVisibility.PRIVATE)
+    publish: bool = False
 
 
-class PostUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
+class PostUpdate(APIModel):
+    slug: str
+    title: str | None = None
+    summary: str | None = None
+    content: str | None = None
+    locale: str | None = None
+    visibility: PostVisibility | None = None
+    publish: bool | None = None
 
 
 class PostRead(PostBase):
-    id: int
-    author_id: int
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    author_id: uuid.UUID | None
+
+
+class PostListResponse(APIModel):
+    items: list[PostRead]
+    meta: PaginationMeta

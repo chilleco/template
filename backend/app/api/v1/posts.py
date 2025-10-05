@@ -1,26 +1,56 @@
-from typing import List
-from fastapi import APIRouter, HTTPException, status, Depends
-from app.schemas.post import PostCreate, PostRead, PostUpdate
-from app.services.post_service import PostService
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.dependencies import get_db_session, get_optional_user, require_permission
+from app.models.user import User
+from app.schemas.base import PaginationInput
+from app.schemas.post import PostCreate, PostListResponse, PostRead, PostUpdate
+from app.services.posts import PostService
 
 router = APIRouter()
-_svc = PostService()
 
-@router.get("/posts", response_model=List[PostRead])
-async def list_posts(skip: int = 0, limit: int = 10):
-    """List all posts"""
-    return await _svc.list_posts(skip=skip, limit=limit)
 
-@router.get("/posts/{post_id}", response_model=PostRead)
-async def get_post(post_id: int):
-    """Get a specific post"""
-    post = await _svc.get_post(post_id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    return post
+@router.post("/list", response_model=PostListResponse)
+async def list_posts(
+    payload: PaginationInput,
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_optional_user),
+) -> dict:
+    service = PostService(session, actor=current_user)
+    posts, meta = await service.list_posts(payload, include_unpublished=bool(current_user))
+    return PostListResponse(items=posts, meta=meta)
 
-@router.post("/posts", response_model=PostRead, status_code=status.HTTP_201_CREATED)
-async def create_post(data: PostCreate):
-    """Create a new post"""
-    # For now, using a dummy author_id of 1 since we don't have authentication
-    return await _svc.create_post(data, author_id=1)
+
+@router.post("/detail", response_model=PostRead)
+async def get_post(
+    payload: dict,
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User | None = Depends(get_optional_user),
+) -> PostRead:
+    slug = payload.get("slug")
+    if not slug:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="missing_slug")
+    service = PostService(session, actor=current_user)
+    return await service.get_post(slug)
+
+
+@router.post("/create", response_model=PostRead)
+async def create_post(
+    payload: PostCreate,
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("post:create")),
+) -> PostRead:
+    service = PostService(session, actor=current_user)
+    return await service.create_post(payload)
+
+
+@router.post("/update", response_model=PostRead)
+async def update_post(
+    payload: PostUpdate,
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("post:update")),
+) -> PostRead:
+    service = PostService(session, actor=current_user)
+    return await service.update_post(payload)

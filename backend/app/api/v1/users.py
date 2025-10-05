@@ -1,71 +1,130 @@
-from typing import List
+from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
-from app.schemas.user import UserCreate, UserRead, UserUpdate
-from app.services.user_service import UserService
+import uuid
+from datetime import datetime, timedelta, timezone
 
-router = APIRouter(tags=["Users"])
-_svc = UserService()                     # можно заменить на Depends(UserService)
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-# ---------------------------------------------------------------- #
-#  OpenAI / Stripe style:                                          #
-#   • POST /v1/users              -> create                        #
-#   • GET  /v1/users/{id}         -> retrieve                      #
-#   • GET  /v1/users              -> list                          #
-#   • POST /v1/users/{id}/deactivate  -> «команда» над ресурсом    #
-#   • POST /v1/users/{id}/update      -> частичное обновление      #
-# ---------------------------------------------------------------- #
+from app.dependencies import get_current_active_user, get_db_session, require_permission
+from app.models.user import Role, User, UserRole
+from app.schemas.user import RoleRead, UserRead, UserUpdate
+from app.services.access import AccessService
 
-@router.post(
-    "/users",
-    response_model=UserRead,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create user (RPC POST)",
-)
-async def create_user(payload: UserCreate):
-    return await _svc.create_user(payload)
+router = APIRouter()
 
 
-@router.get(
-    "/users/{user_id}",
-    response_model=UserRead,
-    summary="Get user by ID",
-)
-async def retrieve_user(user_id: str):
-    user = await _svc.get_user(user_id)
+def _serialize_user(user: User) -> UserRead:
+    permissions = sorted(AccessService(user).user_permissions())
+    roles = [role.slug for role in user.roles]
+    return UserRead(
+        id=user.id,
+        email=user.email,
+        phone_e164=user.phone_e164,
+        username=user.username,
+        full_name=user.full_name,
+        locale=user.locale,
+        timezone=user.timezone,
+        is_active=user.is_active,
+        is_verified=user.is_verified,
+        is_superuser=user.is_superuser,
+        banned_until=user.banned_until,
+        roles=roles,
+        permissions=permissions,
+    )
+
+
+@router.post("/me/profile", response_model=UserRead)
+async def read_profile(current_user: User = Depends(get_current_active_user)) -> UserRead:
+    return _serialize_user(current_user)
+
+
+@router.post("/me/update", response_model=UserRead)
+async def update_profile(
+    payload: UserUpdate,
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_active_user),
+) -> UserRead:
+    if payload.full_name is not None:
+        current_user.full_name = payload.full_name
+    if payload.locale is not None:
+        current_user.locale = payload.locale
+    if payload.timezone is not None:
+        current_user.timezone = payload.timezone
+    await session.flush()
+    return _serialize_user(current_user)
+
+
+@router.post("/roles/list", response_model=list[RoleRead])
+async def list_roles(
+    _: User = Depends(require_permission("admin:access")),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[RoleRead]:
+    roles = (await session.execute(select(Role))).scalars().unique().all()
+    return [
+        RoleRead(
+            name=role.name,
+            slug=role.slug,
+            permissions=[perm.permission for perm in role.permissions],
+        )
+        for role in roles
+    ]
+
+
+@router.post("/ban", response_model=UserRead)
+async def ban_user(
+    payload: dict,
+    _: User = Depends(require_permission("user:ban")),
+    session: AsyncSession = Depends(get_db_session),
+) -> UserRead:
+    user_id_str = payload.get("user_id")
+    duration_minutes = payload.get("minutes")
+    if not user_id_str or duration_minutes is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_payload")
+    try:
+        user_id = uuid.UUID(user_id_str)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_user_id") from exc
+
+    user = await session.get(User, user_id)
     if not user:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
-    return user
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
+
+    user.banned_until = datetime.now(timezone.utc) + timedelta(minutes=int(duration_minutes))
+    await session.flush()
+    return _serialize_user(user)
 
 
-@router.get(
-    "/users",
-    response_model=List[UserRead],
-    summary="List users (GET for cache-friendliness)",
-)
-async def list_users(skip: int = 0, limit: int = 10):
-    return await _svc.list_users(skip, limit)
-
-
-@router.post(
-    "/users/{user_id}/update",
-    response_model=UserRead,
-    summary="Partial update (RPC POST)",
-)
-async def update_user(user_id: str, payload: UserUpdate):
+@router.post("/roles/assign", response_model=UserRead)
+async def assign_role(
+    payload: dict,
+    _: User = Depends(require_permission("admin:access")),
+    session: AsyncSession = Depends(get_db_session),
+) -> UserRead:
+    user_id = payload.get("user_id")
+    role_slug = payload.get("role_slug")
+    if not user_id or not role_slug:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_payload")
     try:
-        return await _svc.update_user(user_id, payload)
-    except ValueError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+        user_uuid = uuid.UUID(user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_user_id") from exc
 
+    user = await session.get(User, user_uuid)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
 
-@router.post(
-    "/users/{user_id}/deactivate",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Deactivate account (command pattern)",
-)
-async def deactivate_user(user_id: str):
-    try:
-        await _svc.update_user(user_id, UserUpdate(is_active=False))
-    except ValueError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+    role = (await session.execute(select(Role).where(Role.slug == role_slug))).scalar_one_or_none()
+    if not role:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="role_not_found")
+
+    existing = (
+        await session.execute(
+            select(UserRole).where(UserRole.user_id == user.id, UserRole.role_id == role.id)
+        )
+    ).scalar_one_or_none()
+    if not existing:
+        session.add(UserRole(user_id=user.id, role_id=role.id))
+        await session.flush()
+    return _serialize_user(user)
