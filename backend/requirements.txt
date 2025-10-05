@@ -1,16 +1,57 @@
-fastapi>=0.112.0
-uvicorn[standard]>=0.30.0
-pydantic[email]>=2.7.0
-pydantic-settings>=2.2.0
-loguru>=0.7.0
-sentry-sdk[fastapi]>=2.5.0
-beanie>=1.25.0
-motor>=3.4.0
-sqlalchemy>=2.0.0
-psycopg2-binary>=2.9.0
-celery[redis]>=5.4.0
-redis>=5.0.0
-apscheduler>=3.10.0
-structlog>=24.1.0
-typer>=0.12.0
-email-validator>=2.0.0
+# Core
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+
+# Database
+sqlalchemy>=2.0.25
+alembic>=1.13.1
+asyncpg>=0.29.0
+
+# Cache
+redis>=5.0.1
+
+# Validation
+pydantic>=2.5.3
+pydantic-settings>=2.1.0
+email-validator>=2.1.0
+phonenumbers>=8.13.27
+
+# Security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Logging & Monitoring
+loguru>=0.7.2
+sentry-sdk[fastapi]>=1.40.0
+
+# HTTP Client
+httpx>=0.26.0
+
+# WebSocket
+websockets>=12.0
+
+# Date/Time
+python-dateutil>=2.8.2
+pytz>=2024.1
+
+# Internationalization
+babel>=2.14.0
+
+# Background Tasks
+celery>=5.3.6
+apscheduler>=3.10.4
+
+# File Handling
+aiofiles>=23.2.1
+pillow>=10.2.0
+
+# Development
+pytest>=7.4.4
+pytest-asyncio>=0.23.3
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+faker>=22.1.0
+black>=24.1.1
+ruff>=0.1.14
+mypy>=1.8.0
